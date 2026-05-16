@@ -9,5 +9,14 @@ import Foundation
 import Combine
 
 final class AppState: ObservableObject {
-    @Published var defaultText: String = "Texto inserido pelo QuickPaste"
+    @Published var defaultText: String {
+        didSet {
+            UserDefaults.standard.set(defaultText, forKey: "defaultText")
+        }
+    }
+
+    init() {
+        self.defaultText = UserDefaults.standard.string(forKey: "defaultText")
+            ?? "Texto inserido pelo QuickPaste"
+    }
 }
