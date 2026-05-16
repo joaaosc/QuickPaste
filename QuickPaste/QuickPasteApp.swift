@@ -9,9 +9,21 @@ import SwiftUI
 
 @main
 struct QuickPasteApp: App {
+    @StateObject private var appState = AppState()
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra {
+            MenuBarContent()
+                .environmentObject(appState)
+        } label: {
+            Image(systemName: "text.cursor")
+        }
+        .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+                .environmentObject(appState)
         }
     }
 }
+ 
