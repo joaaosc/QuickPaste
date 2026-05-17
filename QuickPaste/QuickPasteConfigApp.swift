@@ -1,7 +1,20 @@
-import Foundation
+#if QUICKPASTE_CONFIG
 import SwiftUI
+import AppKit
 
-struct SettingsContent: View {
+@main
+struct QuickPasteConfigApp: App {
+    var body: some Scene {
+        WindowGroup("QuickPaste Configurações") {
+            QuickPasteConfigView()
+                .frame(minWidth: 420, minHeight: 320)
+        }
+        .defaultPosition(.center)
+        .defaultSize(width: 520, height: 380)
+    }
+}
+
+struct QuickPasteConfigView: View {
     @State private var optionA: String = "Padrão"
     @State private var optionB: String = "Médio"
     @State private var radioSelection: Int = 0
@@ -11,7 +24,7 @@ struct SettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Configurações")
+            Text("Configurações do QuickPaste")
                 .font(.title2)
                 .bold()
 
@@ -37,8 +50,7 @@ struct SettingsContent: View {
 
             Spacer()
         }
-        .padding()
-        .frame(minWidth: 360, minHeight: 260)
+        .padding(20)
     }
 
     private func openAbout() {
@@ -53,3 +65,4 @@ struct SettingsContent: View {
         }
     }
 }
+#endif

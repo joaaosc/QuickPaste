@@ -4,14 +4,16 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var editorPanel: NSPanel?
-    private var settingsPopover: NSPopover?
-    private var contextMenu: NSMenu?
+    private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
         setupEditorPanel()
-        setupSettingsPopover()
-        setupContextMenu()
+        setupSettingsWindow()
+
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeSpaceDidChange(_:)), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+
+        // Optionally open editor at launch can be wired to settings later
     }
 
     private func setupStatusItem() {
@@ -36,12 +38,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hostingController = NSHostingController(rootView: contentView)
 
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 220),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 300),
             styleMask: [
                 .titled,
                 .resizable,
-                .closable,
-                .nonactivatingPanel
+                .closable
             ],
             backing: .buffered,
             defer: false
@@ -50,8 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.contentViewController = hostingController
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
-        panel.level = .floating
-        panel.minSize = NSSize(width: 240, height: 140)
+        panel.level = keepEditorFloating ? .floating : .normal
+        panel.minSize = NSSize(width: 320, height: 200)
 
         panel.collectionBehavior = [
             .canJoinAllSpaces,
@@ -63,34 +64,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.editorPanel = panel
     }
 
-    private func setupSettingsPopover() {
+    private func setupSettingsWindow() {
         let contentView = SettingsContent()
         let hostingController = NSHostingController(rootView: contentView)
 
-        let popover = NSPopover()
-        popover.behavior = .transient
-        popover.contentSize = NSSize(width: 360, height: 220)
-        popover.contentViewController = hostingController
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 300),
+            styleMask: [
+                .titled,
+                .closable,
+                .miniaturizable,
+                .resizable
+            ],
+            backing: .buffered,
+            defer: false
+        )
 
-        self.settingsPopover = popover
+        window.contentViewController = hostingController
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 360, height: 260)
+        window.title = "Configurações"
+        window.setFrameAutosaveName("SettingsWindow")
+        window.center()
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.level = .floating
+
+        self.settingsWindow = window
     }
 
     @objc private func statusItemClicked() {
-        guard let event = NSApp.currentEvent else {
-            toggleEditorPanel()
-            return
-        }
-
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        let isRightClick = (event.type == .rightMouseUp) || flags.contains(.control)
-
-        if isRightClick {
-            showContextMenu()
-        } else if flags.contains(.command) || flags.contains(.option) {
-            showSettingsPanel()
-        } else {
-            toggleEditorPanel()
-        }
+        toggleEditorPanel()
     }
 
     private func toggleEditorPanel() {
@@ -121,48 +124,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let y = screenFrame.minY - panelSize.height - 8
 
         editorPanel.setFrameOrigin(NSPoint(x: x, y: y))
-        editorPanel.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+        editorPanel.makeKeyAndOrderFront(nil)
     }
 
-    private func showSettingsPanel() {
-        guard
-            let popover = settingsPopover,
-            let button = statusItem?.button
-        else { return }
+    private func showSettingsWindow() {
+        guard let settingsWindow else { return }
 
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        editorPanel?.orderOut(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow.deminiaturize(nil)
+        settingsWindow.makeKeyAndOrderFront(nil)
+    }
+
+    private var keepEditorFloating: Bool {
+        // Default to true while settings are not available here
+        return true
+    }
+
+    private func openSettingsApp() {
+        let settingsAppURL = Bundle.main.bundleURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("QuickPasteConfig.app")
+
+        guard FileManager.default.fileExists(atPath: settingsAppURL.path) else {
+            showSettingsWindow()
+            return
+        }
+
+        NSWorkspace.shared.openApplication(
+            at: settingsAppURL,
+            configuration: NSWorkspace.OpenConfiguration()
+        ) { [weak self] _, error in
+            guard error != nil else { return }
+
+            DispatchQueue.main.async {
+                self?.showSettingsWindow()
+            }
         }
     }
 
-    private func setupContextMenu() {
-        let menu = NSMenu()
-
-        let settingsItem = NSMenuItem(title: "Configurações…", action: #selector(openSettingsFromMenu), keyEquivalent: ",")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let quitItem = NSMenuItem(title: "Sair", action: #selector(quitApp), keyEquivalent: "q")
-        quitItem.target = self
-        menu.addItem(quitItem)
-
-        self.contextMenu = menu
-    }
-
-    private func showContextMenu() {
-        guard let menu = contextMenu, let statusItem = statusItem else { return }
-        statusItem.popUpMenu(menu)
-    }
-
-    @objc private func openSettingsFromMenu() {
-        showSettingsPanel()
-    }
-
-    @objc private func quitApp() {
-        NSApp.terminate(nil)
+    @objc private func activeSpaceDidChange(_ notification: Notification) {
+        if let settingsWindow, settingsWindow.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            settingsWindow.makeKeyAndOrderFront(nil)
+        }
+        if let editorPanel, editorPanel.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            editorPanel.makeKeyAndOrderFront(nil)
+        }
     }
 }

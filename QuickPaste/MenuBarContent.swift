@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct MenuBarContent: View {
-    @State private var text: String = ""
+    @State private var text: String = QuickPasteSettings.defaults.string(forKey: "defaultText") ?? ""
 
     var body: some View {
         TextEditor(text: $text)

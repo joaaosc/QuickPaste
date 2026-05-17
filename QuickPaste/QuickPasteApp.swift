@@ -13,7 +13,7 @@ struct QuickPasteApp: App {
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            SettingsContent()
         }
     }
 }
