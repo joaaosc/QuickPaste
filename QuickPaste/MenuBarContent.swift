@@ -4,6 +4,7 @@
 //
 //  Created by João Pedro Torres on 16/05/26.
 //
+
 import SwiftUI
 
 struct MenuBarContent: View {
@@ -13,6 +14,6 @@ struct MenuBarContent: View {
         TextEditor(text: $text)
             .font(.body)
             .padding(8)
-            .frame(width: 320, height: 180)
+            .frame(minWidth: 240, minHeight: 140)
     }
 }
