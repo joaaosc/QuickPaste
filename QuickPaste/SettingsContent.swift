@@ -1,55 +1,29 @@
-import Foundation
 import SwiftUI
 
 struct SettingsContent: View {
-    @State private var optionA: String = "Padrão"
-    @State private var optionB: String = "Médio"
-    @State private var radioSelection: Int = 0
+    @AppStorage("openEditorAtLaunch", store: QuickPasteSettings.defaults)
+    private var openEditorAtLaunch = false
 
-    private let optionsA = ["Padrão", "Rápido", "Seguro"]
-    private let optionsB = ["Baixo", "Médio", "Alto"]
+    @AppStorage("keepEditorFloating", store: QuickPasteSettings.defaults)
+    private var keepEditorFloating = true
+
+    @AppStorage("defaultText", store: QuickPasteSettings.defaults)
+    private var defaultText = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Configurações")
-                .font(.title2)
-                .bold()
-
-            Form {
-                Picker("Modo", selection: $optionA) {
-                    ForEach(optionsA, id: \.self) { Text($0) }
-                }
-                Picker("Qualidade", selection: $optionB) {
-                    ForEach(optionsB, id: \.self) { Text($0) }
-                }
-                Picker("Preferência", selection: $radioSelection) {
-                    Text("Opção 1").tag(0)
-                    Text("Opção 2").tag(1)
-                    Text("Opção 3").tag(2)
-                }
-                .pickerStyle(.radioGroup)
+        Form {
+            Section("Editor") {
+                Toggle("Abrir editor ao iniciar", isOn: $openEditorAtLaunch)
+                Toggle("Manter janela acima das outras", isOn: $keepEditorFloating)
             }
 
-            HStack(spacing: 12) {
-                Button("Sobre") { openAbout() }
-                Button("Doar") { openDonate() }
+            Section("Conteúdo") {
+                TextField("Texto padrão", text: $defaultText, axis: .vertical)
+                    .lineLimit(3...6)
             }
-
-            Spacer()
         }
-        .padding()
-        .frame(minWidth: 360, minHeight: 260)
-    }
-
-    private func openAbout() {
-        if let url = URL(string: "https://example.com/about") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func openDonate() {
-        if let url = URL(string: "https://example.com/donate") {
-            NSWorkspace.shared.open(url)
-        }
+        .formStyle(.grouped)
+        .padding(20)
+        .frame(width: 420)
     }
 }

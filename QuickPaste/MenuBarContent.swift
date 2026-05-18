@@ -14,6 +14,6 @@ struct MenuBarContent: View {
         TextEditor(text: $text)
             .font(.body)
             .padding(8)
-            .frame(minWidth: 240, minHeight: 140)
+            .frame(minWidth: 480, minHeight: 320)
     }
 }

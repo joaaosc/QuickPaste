@@ -1,1 +1,5 @@
+.DS_Store
 .build/
+DerivedData/
+QuickPaste.xcodeproj/xcuserdata/
+*.xcuserstate
