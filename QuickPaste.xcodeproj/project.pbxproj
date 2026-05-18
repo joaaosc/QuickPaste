@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		EF68515F2FBADDFB00158F93 /* QuickPasteSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF68515E2FBADDFB00158F93 /* QuickPasteSettings.swift */; };
+		EF6851602FBADDFC00158F93 /* QuickPasteSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF68515E2FBADDFB00158F93 /* QuickPasteSettings.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		1D7A000A2FB920000000000A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -19,6 +24,7 @@
 /* Begin PBXFileReference section */
 		1D7A00012FB9200000000001 /* QuickPasteConfig.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuickPasteConfig.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EF6850DB2FB916B500158F93 /* QuickPaste.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuickPaste.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EF68515E2FBADDFB00158F93 /* QuickPasteSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPasteSettings.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -55,6 +61,7 @@
 		EF6850D22FB916B500158F93 = {
 			isa = PBXGroup;
 			children = (
+				EF68515D2FBADDCB00158F93 /* Shared */,
 				EF6850DD2FB916B500158F93 /* QuickPaste */,
 				1D7A00022FB9200000000002 /* QuickPasteConfig */,
 				EF6850DC2FB916B500158F93 /* Products */,
@@ -68,6 +75,14 @@
 				1D7A00012FB9200000000001 /* QuickPasteConfig.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		EF68515D2FBADDCB00158F93 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				EF68515E2FBADDFB00158F93 /* QuickPasteSettings.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -178,6 +193,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EF6851602FBADDFC00158F93 /* QuickPasteSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -185,6 +201,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EF68515F2FBADDFB00158F93 /* QuickPasteSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
