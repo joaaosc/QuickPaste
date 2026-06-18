@@ -5,32 +5,26 @@ import Translation
 
 /// Owns the scratchpad's state and orchestrates translation, keeping `EditorView` thin.
 ///
-/// SwiftUI-coupled bits stay in the view by design: `translationTask` provides a
-/// `TranslationSession` that is only valid inside its closure (using it later traps —
-/// confirmed via apple-docs MCP). So this model holds the *state machine*,
-/// language detection, persistence and post-processing; the view just feeds the
-/// session's result back in via `finishTranslation` / `failTranslation`.
+/// The note content is an `NSAttributedString` so pasted images live **inline in the
+/// text body** (as text attachments). Plain-text features (translation, counts, language
+/// detection) derive from `plainText`. SwiftUI-coupled translation stays in the view:
+/// `TranslationSession` is only valid inside the `translationTask` closure (confirmed via
+/// apple-docs MCP), so the view feeds results back via `finishTranslation`/`failTranslation`.
 @MainActor
 @Observable
 final class EditorModel {
     // MARK: Observable state
 
-    /// The note text. The view binds to this directly (`$model.text`) and reports
-    /// edits via `handleTextChanged()` from `.onChange`.
-    var text: String
+    /// The note as rich text (text + inline image attachments). The editor view edits this.
+    private(set) var attributedText: NSAttributedString
+
     private(set) var detectedLanguage: TranslationLanguage?
-
-    /// An image pasted from the clipboard (⌘V). Shown as an attachment in the editor;
-    /// translation ignores it for now.
-    private(set) var attachedImage: NSImage?
-
     private(set) var translation: TranslationOutcome = .idle
 
     /// Drives the view's `translationTask`. Reassigning (or invalidating) it re-runs the task.
     var translationConfiguration: TranslationSession.Configuration?
 
-    /// Snapshot of the text captured when translation was requested. The session is
-    /// only valid inside the task closure, so the view reads this instead of `text`.
+    /// Snapshot of the plain text captured when translation was requested.
     private(set) var pendingSourceText = ""
 
     // MARK: Dependencies
@@ -57,42 +51,48 @@ final class EditorModel {
         self.persistDebounce = persistDebounce
         self.detectDebounce = detectDebounce
 
-        let restored = persistence.note
-        self.text = restored
-        self.detectedLanguage = detector.detect(in: restored)
-        self.attachedImage = persistence.imageData.flatMap(NSImage.init(data:))
+        if let data = persistence.richDocument, let restored = Self.attributedString(fromRTFD: data) {
+            self.attributedText = restored
+        } else {
+            self.attributedText = NSAttributedString(string: persistence.note)
+        }
+        self.detectedLanguage = detector.detect(in: self.attributedText.string)
     }
 
     // MARK: Derived
 
-    var isEmpty: Bool { text.isEmpty }
-    var hasContent: Bool { !text.isEmpty || attachedImage != nil }
-    var wordCount: Int { text.split(whereSeparator: \.isWhitespace).count }
-    var characterCount: Int { text.count }
+    /// The note's text, excluding image attachments (the object-replacement char U+FFFC),
+    /// so translation, copy and counts operate on real text only.
+    var plainText: String { attributedText.string.replacingOccurrences(of: "\u{FFFC}", with: "") }
+    var isEmpty: Bool { plainText.isEmpty }
+    var hasContent: Bool { attributedText.length > 0 }
+    var wordCount: Int { plainText.split(whereSeparator: \.isWhitespace).count }
+    var characterCount: Int { plainText.count }
 
     // MARK: Editing
 
-    /// React to a text change (the view calls this from `.onChange(of:)`). Debounces
-    /// persistence and language detection so we neither write to disk nor re-detect
-    /// on every keystroke.
-    func handleTextChanged() {
+    /// React to a content change reported by the editor. Debounces persistence and
+    /// language detection so we neither write to disk nor re-detect on every keystroke.
+    func updateContent(_ newValue: NSAttributedString) {
+        guard !newValue.isEqual(to: attributedText) else { return }
+        attributedText = newValue
         schedulePersist()
         scheduleDetect()
     }
 
     private func schedulePersist() {
         persistTask?.cancel()
-        let snapshot = text
+        let snapshot = attributedText
         persistTask = Task { [persistDebounce] in
             try? await Task.sleep(for: persistDebounce)
             guard !Task.isCancelled else { return }
-            persistence.note = snapshot
+            persist(snapshot)
         }
     }
 
     private func scheduleDetect() {
         detectTask?.cancel()
-        let snapshot = text
+        let snapshot = plainText
         detectTask = Task { [detectDebounce] in
             try? await Task.sleep(for: detectDebounce)
             guard !Task.isCancelled else { return }
@@ -103,18 +103,20 @@ final class EditorModel {
     /// Flush any pending write immediately (panel close / app termination).
     func persistNow() {
         persistTask?.cancel()
-        persistence.note = text
+        persist(attributedText)
+    }
+
+    private func persist(_ attr: NSAttributedString) {
+        persistence.richDocument = Self.rtfdData(from: attr)
+        persistence.note = attr.string
     }
 
     // MARK: Translation orchestration
 
-    /// Builds/refreshes the configuration so the view's `translationTask` fires.
-    /// When the detected source equals the target we leave `source` nil and let the
-    /// system auto-detect, avoiding a misleading hint driving the request.
     func requestTranslation(to target: TranslationLanguage) {
-        guard !text.isEmpty else { return }
+        guard !plainText.isEmpty else { return }
 
-        pendingSourceText = text
+        pendingSourceText = plainText
         translation = .inProgress
 
         let source: Locale.Language? = (detectedLanguage == target) ? nil : detectedLanguage?.locale
@@ -129,7 +131,6 @@ final class EditorModel {
         }
     }
 
-    /// Post-processing seam: trim and reject empty output before showing it.
     func finishTranslation(_ targetText: String) {
         let trimmed = targetText.trimmingCharacters(in: .whitespacesAndNewlines)
         translation = trimmed.isEmpty ? .failed("Tradução vazia.") : .completed(trimmed)
@@ -144,18 +145,20 @@ final class EditorModel {
         translationConfiguration = nil
     }
 
-    /// Replace the note with the translation (user-initiated, never automatic).
+    /// Replace the note with the translation (user-initiated). Drops inline images.
     func adoptTranslation() {
         guard let value = translation.result else { return }
-        text = value
+        attributedText = NSAttributedString(string: value)
+        persistNow()
+        detectedLanguage = detector.detect(in: value)
         dismissTranslation()
     }
 
     // MARK: Pasteboard actions
 
     func copyNote() {
-        guard !text.isEmpty else { return }
-        pasteboard.write(text)
+        guard !plainText.isEmpty else { return }
+        pasteboard.write(plainText)
     }
 
     func copyTranslation() {
@@ -163,31 +166,29 @@ final class EditorModel {
         pasteboard.write(value)
     }
 
-    // MARK: Image attachment
-
-    /// Attach an image pasted from the clipboard, persisting it as PNG.
-    func pasteImage(_ image: NSImage) {
-        attachedImage = image
-        persistence.imageData = Self.pngData(from: image)
-    }
-
-    func removeImage() {
-        attachedImage = nil
-        persistence.imageData = nil
-    }
-
-    private static func pngData(from image: NSImage) -> Data? {
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
-        return bitmap.representation(using: .png, properties: [:])
-    }
-
     // MARK: Clearing
 
     func clear() {
-        text = ""
-        attachedImage = nil
-        persistence.imageData = nil
+        attributedText = NSAttributedString(string: "")
+        detectedLanguage = nil
+        persistNow()
         dismissTranslation()
+    }
+
+    // MARK: RTFD helpers
+
+    static func rtfdData(from attr: NSAttributedString) -> Data? {
+        try? attr.data(
+            from: NSRange(location: 0, length: attr.length),
+            documentAttributes: [.documentType: NSAttributedString.DocumentType.rtfd]
+        )
+    }
+
+    static func attributedString(fromRTFD data: Data) -> NSAttributedString? {
+        try? NSAttributedString(
+            data: data,
+            options: [.documentType: NSAttributedString.DocumentType.rtfd],
+            documentAttributes: nil
+        )
     }
 }

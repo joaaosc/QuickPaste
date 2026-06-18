@@ -7,7 +7,10 @@ enum QuickPasteSettings {
         static let editorFontSize = "editorFontSize"
         static let targetLanguage = "targetLanguage"
         static let noteText = "noteText"
-        static let noteImageData = "noteImageData"
+        static let noteRTFD = "noteRTFD"
+        static let translationEnabled = "translationEnabled"
+        static let ocrEnabled = "ocrEnabled"
+        static let allowMultipleImages = "allowMultipleImages"
     }
 
     static let defaults = UserDefaults.standard
@@ -18,6 +21,9 @@ enum QuickPasteSettings {
             Key.globalHotKeyEnabled: true,
             Key.editorFontSize: 14.0,
             Key.targetLanguage: TranslationLanguage.english.rawValue,
+            Key.translationEnabled: true,
+            Key.ocrEnabled: false,
+            Key.allowMultipleImages: false,
         ])
     }
 

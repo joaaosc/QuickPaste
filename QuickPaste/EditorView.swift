@@ -8,6 +8,12 @@ struct EditorView: View {
     @AppStorage(QuickPasteSettings.Key.targetLanguage)
     private var targetLanguageRaw = TranslationLanguage.english.rawValue
 
+    @AppStorage(QuickPasteSettings.Key.translationEnabled)
+    private var translationEnabled = true
+
+    @AppStorage(QuickPasteSettings.Key.allowMultipleImages)
+    private var allowMultipleImages = false
+
     @State private var model: EditorModel
     @State private var didCopy = false
     @State private var focusToken = 0
@@ -26,9 +32,9 @@ struct EditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            editorArea
+            editor
 
-            if model.translation.isActive {
+            if translationEnabled, model.translation.isActive {
                 translationCard
             }
 
@@ -53,35 +59,23 @@ struct EditorView: View {
         .onDisappear { model.persistNow() }
     }
 
-    // MARK: - Editor area (image attachment + text)
+    // MARK: - Editor
 
-    private var editorArea: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let image = model.attachedImage {
-                attachedImageView(image)
-            }
-
-            noteField
-        }
-    }
-
-    private var noteField: some View {
-        @Bindable var model = model
-
-        return NoteTextEditor(
-            text: $model.text,
-            fontSize: fontSize,
+    private var editor: some View {
+        NoteTextEditor(
+            attributedText: model.attributedText,
+            fontSize: CGFloat(fontSize),
+            allowMultipleImages: allowMultipleImages,
             focusToken: focusToken,
-            onPasteImage: { model.pasteImage($0) }
+            onChange: { model.updateContent($0) }
         )
-        .onChange(of: model.text) { model.handleTextChanged() }
         .accessibilityLabel("Nota")
         .overlay(alignment: .topLeading) { placeholder }
     }
 
     @ViewBuilder
     private var placeholder: some View {
-        if model.text.isEmpty && model.attachedImage == nil {
+        if !model.hasContent {
             Text("Escreva algo ou cole uma imagem (⌘V)…")
                 .font(.system(size: fontSize))
                 .foregroundStyle(.tertiary)
@@ -90,32 +84,6 @@ struct EditorView: View {
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
-    }
-
-    private func attachedImageView(_ image: NSImage) -> some View {
-        Image(nsImage: image)
-            .resizable()
-            .scaledToFit()
-            .frame(maxWidth: .infinity, maxHeight: 140, alignment: .leading)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(alignment: .topTrailing) {
-                Button {
-                    model.removeImage()
-                    focusToken += 1
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, .black.opacity(0.45))
-                        .font(.title3)
-                }
-                .buttonStyle(.plain)
-                .padding(6)
-                .help("Remover imagem")
-                .accessibilityLabel("Remover imagem")
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 10)
-            .accessibilityLabel("Imagem colada")
     }
 
     // MARK: - Tradução
@@ -183,6 +151,13 @@ struct EditorView: View {
 
     private var bottomBar: some View {
         HStack(spacing: 12) {
+            SettingsLink {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.borderless)
+            .help("Configurações")
+            .accessibilityLabel("Configurações")
+
             Text(statsText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -198,25 +173,27 @@ struct EditorView: View {
 
             Spacer()
 
-            Picker("Idioma de destino", selection: $targetLanguageRaw) {
-                ForEach(TranslationLanguage.allCases) { language in
-                    Text(language.displayName).tag(language.rawValue)
+            if translationEnabled {
+                Picker("Idioma de destino", selection: $targetLanguageRaw) {
+                    ForEach(TranslationLanguage.allCases) { language in
+                        Text(language.displayName).tag(language.rawValue)
+                    }
                 }
-            }
-            .labelsHidden()
-            .controlSize(.small)
-            .frame(width: 130)
-            .help("Idioma de destino da tradução")
+                .labelsHidden()
+                .controlSize(.small)
+                .frame(width: 130)
+                .help("Idioma de destino da tradução")
 
-            Button {
-                model.requestTranslation(to: targetLanguage)
-            } label: {
-                Image(systemName: "globe")
+                Button {
+                    model.requestTranslation(to: targetLanguage)
+                } label: {
+                    Image(systemName: "globe")
+                }
+                .buttonStyle(.borderless)
+                .disabled(model.isEmpty || model.translation.isInProgress)
+                .help("Traduzir nota")
+                .accessibilityLabel("Traduzir nota")
             }
-            .buttonStyle(.borderless)
-            .disabled(model.isEmpty || model.translation.isInProgress)
-            .help("Traduzir nota")
-            .accessibilityLabel("Traduzir nota")
 
             Button {
                 model.copyNote()

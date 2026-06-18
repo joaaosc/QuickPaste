@@ -12,8 +12,8 @@ import NaturalLanguage
 /// but the model only depends on this protocol so tests can inject an in-memory store.
 protocol NotePersisting: AnyObject {
     var note: String { get set }
-    /// Encoded (PNG) data for an attached image, or nil when there is none.
-    var imageData: Data? { get set }
+    /// The note as an RTFD document (embeds inline images), or nil when empty.
+    var richDocument: Data? { get set }
 }
 
 nonisolated final class UserDefaultsNotePersistence: NotePersisting {
@@ -30,13 +30,13 @@ nonisolated final class UserDefaultsNotePersistence: NotePersisting {
         set { defaults.set(newValue, forKey: key) }
     }
 
-    var imageData: Data? {
-        get { defaults.data(forKey: QuickPasteSettings.Key.noteImageData) }
+    var richDocument: Data? {
+        get { defaults.data(forKey: QuickPasteSettings.Key.noteRTFD) }
         set {
             if let newValue {
-                defaults.set(newValue, forKey: QuickPasteSettings.Key.noteImageData)
+                defaults.set(newValue, forKey: QuickPasteSettings.Key.noteRTFD)
             } else {
-                defaults.removeObject(forKey: QuickPasteSettings.Key.noteImageData)
+                defaults.removeObject(forKey: QuickPasteSettings.Key.noteRTFD)
             }
         }
     }
@@ -45,10 +45,10 @@ nonisolated final class UserDefaultsNotePersistence: NotePersisting {
 /// In-memory note store for SwiftUI previews and unit tests (no UserDefaults side effects).
 nonisolated final class InMemoryNotePersistence: NotePersisting {
     var note: String
-    var imageData: Data?
-    init(note: String = "", imageData: Data? = nil) {
+    var richDocument: Data?
+    init(note: String = "", richDocument: Data? = nil) {
         self.note = note
-        self.imageData = imageData
+        self.richDocument = richDocument
     }
 }
 
