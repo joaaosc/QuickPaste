@@ -2,6 +2,15 @@
 
 ## Não lançado
 
+- **Liquid Glass** (macOS 26) na toolbar do editor, no cartão de tradução e no cabeçalho do Sobre;
+  botão de Configurações (engrenagem) prominente para maior visibilidade.
+- A janela de **Configurações abre como janela ativa, acima de tudo** (inclusive da nota).
+- **Atalho global personalizado** para mostrar/ocultar a nota (gravador na aba Atalhos; vazio por
+  padrão; funciona junto do ⌃⌥Espaço).
+- Opção **OCR em imagens** (em Avançado), ainda não implementada (será com Vision).
+- Guia de desenvolvimento (`docs/explanation/development-guide.md`) e how-to do atalho para
+  continuar o desenvolvimento fora do Claude.
+
 - Reformula o editor em MVVM (`EditorModel` `@Observable`) com seams por protocolo (persistência,
   pasteboard, detecção de idioma) e persistência da nota com debounce.
 - Adiciona detecção de idioma on-device (NaturalLanguage) e rótulos de acessibilidade no editor.

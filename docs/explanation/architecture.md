@@ -46,8 +46,21 @@ Preferências via `@AppStorage` (sem acoplar UI à lógica).
 ## Camada de janelas (painel acima de tudo, exceto Settings)
 O painel da nota fica em `NSWindow.Level.floating` (acima de todos os apps). Como a janela de
 Settings é a única janela **titulada não-painel** do app, o `AppDelegate` observa o foco de janelas:
-ao Settings virar key, baixa o painel para `.normal` (Settings fica acima); restaura `.floating`
-quando o painel reganha foco ou a Settings fecha. Vale para o item de menu e para o `SettingsLink`.
+ao Settings virar key, **ativa o app** (`NSApp.activate()`), eleva a Settings acima do painel e
+ordena-a à frente — garantindo que abra como **janela ativa, acima de tudo** — e baixa o painel para
+`.normal`. Ao perder o foco, a Settings volta a `.normal`; ao fechar, o painel volta a `.floating`.
+Vale para o item de menu e para o `SettingsLink`.
+
+## Atalhos globais
+`HotKeyManager.reload()` (chamado pelo `AppDelegate` no launch e a cada `UserDefaults.didChange`)
+registra via Carbon (`RegisterEventHotKey`) o atalho **fixo ⌃⌥Espaço** (se `globalHotKeyEnabled`) e o
+**personalizado** (se definido). O `ShortcutRecorder` (AppKit) grava keyCode + modificadores Carbon
++ string de exibição em `UserDefaults`. Ambos chamam o mesmo handler (alternar a nota).
+
+## Liquid Glass
+macOS 26+: o editor usa estilos de botão `.glass`/`.glassProminent` (engrenagem prominente para
+destaque) e `.glassEffect(_:in:)` no cartão de tradução; o Sobre tem um cabeçalho em glass.
+Seguindo a HIG, deixamos o **sistema** aplicar material/interação em vez de imitar vidro à mão.
 
 ## On-device e privacidade
 O app é **sandboxed e sem entitlement de rede**. Tudo roda localmente:

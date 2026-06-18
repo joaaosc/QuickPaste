@@ -6,9 +6,12 @@ leitor:
 | Seção | Para quê | Comece por |
 |---|---|---|
 | **Tutoriais** | Aprender fazendo, do zero | [tutorials/getting-started.md](tutorials/getting-started.md) |
-| **How-to** | Resolver uma tarefa específica | [how-to/open-settings.md](how-to/open-settings.md) · [how-to/paste-an-image.md](how-to/paste-an-image.md) |
+| **How-to** | Resolver uma tarefa específica | [open-settings](how-to/open-settings.md) · [paste-an-image](how-to/paste-an-image.md) · [set-a-custom-shortcut](how-to/set-a-custom-shortcut.md) |
 | **Referência** | Consultar fatos (atalhos, settings) | [reference/keyboard-shortcuts.md](reference/keyboard-shortcuts.md) |
-| **Explicação** | Entender o desenho e os porquês | [explanation/architecture.md](explanation/architecture.md) |
+| **Explicação** | Entender o desenho e os porquês | [architecture](explanation/architecture.md) · [development-guide](explanation/development-guide.md) |
+
+> Quer continuar o desenvolvimento sem o Claude? Comece pelo
+> **[guia de desenvolvimento](explanation/development-guide.md)**.
 
 Outros documentos do projeto:
 - [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) — checklist de release.
