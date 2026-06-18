@@ -23,7 +23,11 @@ struct AboutSettingsView: View {
                         Text("Bloco de rascunho na barra de menus")
                             .foregroundStyle(.secondary)
                     }
+
+                    Spacer()
                 }
+                .padding(12)
+                .glassEffect(in: RoundedRectangle(cornerRadius: 12))
 
                 LabeledContent("Versão", value: versionText)
             }

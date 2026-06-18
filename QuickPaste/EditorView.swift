@@ -138,11 +138,8 @@ struct EditorView: View {
                 .controlSize(.small)
             }
         }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.quaternary.opacity(0.4))
-        )
+        .padding(12)
+        .glassEffect(in: RoundedRectangle(cornerRadius: 14))
         .padding(.horizontal, 10)
         .padding(.bottom, 8)
     }
@@ -152,9 +149,11 @@ struct EditorView: View {
     private var bottomBar: some View {
         HStack(spacing: 12) {
             SettingsLink {
-                Image(systemName: "gearshape")
+                Image(systemName: "gearshape.fill")
+                    .fontWeight(.semibold)
+                    .imageScale(.large)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.glassProminent)
             .help("Configurações")
             .accessibilityLabel("Configurações")
 
@@ -189,7 +188,7 @@ struct EditorView: View {
                 } label: {
                     Image(systemName: "globe")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.glass)
                 .disabled(model.isEmpty || model.translation.isInProgress)
                 .help("Traduzir nota")
                 .accessibilityLabel("Traduzir nota")
@@ -206,7 +205,7 @@ struct EditorView: View {
                 Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
                     .foregroundStyle(didCopy ? .green : .primary)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.glass)
             .disabled(model.isEmpty)
             .help("Copiar nota inteira")
             .accessibilityLabel(didCopy ? "Copiado" : "Copiar nota")
@@ -217,7 +216,7 @@ struct EditorView: View {
             } label: {
                 Image(systemName: "trash")
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.glass)
             .disabled(!model.hasContent)
             .help("Limpar nota")
             .accessibilityLabel("Limpar nota")
