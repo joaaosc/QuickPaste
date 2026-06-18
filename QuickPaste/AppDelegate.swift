@@ -26,6 +26,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
+        // Keep the note above every app, except the Settings window.
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowWillClose(_:)),
+            name: NSWindow.willCloseNotification,
+            object: nil
+        )
+
         if QuickPasteSettings.openEditorAtLaunch {
             DispatchQueue.main.async { [weak self] in
                 self?.showEditorPanel()
@@ -96,6 +110,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openSettings() {
         NSApp.activate()
         NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
+    // MARK: - Window layering
+
+    // The note panel floats above all apps. The Settings window is the only titled,
+    // non-panel window this app creates, so when it takes focus we drop the panel to
+    // the normal level (letting Settings sit above it) and restore floating afterwards.
+
+    private func isSettingsWindow(_ window: NSWindow) -> Bool {
+        window !== editorPanel
+            && !(window is NSPanel)
+            && window.styleMask.contains(.titled)
+    }
+
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+
+        if window === editorPanel {
+            editorPanel?.level = .floating
+        } else if isSettingsWindow(window) {
+            editorPanel?.level = .normal
+        }
+    }
+
+    @objc private func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, isSettingsWindow(window) else { return }
+        editorPanel?.level = .floating
     }
 
     // MARK: - Editor panel
