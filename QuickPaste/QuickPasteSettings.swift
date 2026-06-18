@@ -62,4 +62,18 @@ enum TranslationLanguage: String, CaseIterable, Identifiable {
     var locale: Locale.Language {
         Locale.Language(identifier: rawValue)
     }
+
+    /// Maps a detected BCP-47 code (e.g. NaturalLanguage's `"en"`, `"pt"`, `"zh-Hans"`)
+    /// to a supported target by comparing primary language subtags.
+    init?(languageCode code: String) {
+        let primary = Self.primarySubtag(code)
+        guard let match = Self.allCases.first(where: { Self.primarySubtag($0.rawValue) == primary }) else {
+            return nil
+        }
+        self = match
+    }
+
+    private static func primarySubtag(_ code: String) -> Substring {
+        code.lowercased().split(separator: "-").first ?? Substring(code.lowercased())
+    }
 }
