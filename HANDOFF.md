@@ -73,3 +73,26 @@ Decisões:
 Arquivos: `EditorModel.swift`, `QuickPasteSettings.swift`, `NoteTextEditor.swift`, `EditorView.swift`.
 Build: `BUILD SUCCEEDED`, sem warnings de Sendable/isolamento.
 Pendente de runtime: não testado na GUI (colar imagem com texto → ver o texto anexado).
+
+### Implementação — Passo 3: clique direito na imagem (OCR + integração LaTeX preparada)
+Raciocínio: ponto de integração do módulo LaTeX é o menu de contexto; deixo o item presente porém
+desabilitado ("em breve") até o módulo existir.
+Decisões:
+- `ClipboardTextView.menu(for:)` detecta o `NSTextAttachment` sob o clique (via
+  `characterIndexForInsertion(at:)`), extrai a `NSImage` (de `.image` ou do `fileWrapper`, p/ cobrir
+  imagens restauradas de RTFD) e monta o menu:
+  - "Reconhecer texto (OCR)" — só quando `ocrEnabled`; chama `onRecognizeImage`.
+  - "Converter fórmula para LaTeX (.tex) — em breve" — **desabilitado** enquanto
+    `onConvertImageToLaTeX == nil` (seam do módulo separado).
+- `NoteTextEditor` ganhou `ocrEnabled`/`onRecognizeImage`/`onConvertToLaTeX (=nil)`; `EditorView`
+  liga o clique direito a `model.recognizeText(in:)`.
+- Rótulo do toggle de OCR em Avançado atualizado (não é mais "em breve" para texto).
+- Testes (Swift Testing, não-wired): `StubClassifier`/`StubRecognizer`; cobrem append quando
+  habilitado+`.text`, no-op quando desabilitado, e skip quando `.noText`.
+Arquivos: `NoteTextEditor.swift`, `EditorView.swift`, `Settings/AdvancedSettingsView.swift`,
+`QuickPasteTests/EditorModelTests.swift`.
+Build: `BUILD SUCCEEDED`.
+
+**Estado do OCR:** Passos 1–3 feitos (texto). Falta: verificação em runtime; pré-processamento
+avançado (deskew/upscale) e `RecognizeDocumentsRequest` (opcional, ver ocr-plan); módulo LaTeX/Core
+AI (branch futura, seam pronto).

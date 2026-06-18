@@ -35,7 +35,7 @@ struct AdvancedSettingsView: View {
             } header: {
                 Text("OCR em imagens")
             } footer: {
-                Text("Em breve — a opção é salva, mas o reconhecimento será implementado com Vision.")
+                Text("Reconhece texto em imagens coladas (Vision, on-device) e pelo clique direito na imagem. A conversão de fórmulas para LaTeX virá depois.")
                     .foregroundStyle(.secondary)
             }
         }

@@ -14,6 +14,9 @@ struct EditorView: View {
     @AppStorage(QuickPasteSettings.Key.allowMultipleImages)
     private var allowMultipleImages = false
 
+    @AppStorage(QuickPasteSettings.Key.ocrEnabled)
+    private var ocrEnabled = false
+
     @State private var model: EditorModel
     @State private var didCopy = false
     @State private var focusToken = 0
@@ -71,6 +74,11 @@ struct EditorView: View {
             onImagePasted: { image in
                 guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
                 Task { await model.handlePastedImage(cgImage) }
+            },
+            ocrEnabled: ocrEnabled,
+            onRecognizeImage: { image in
+                guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+                Task { await model.recognizeText(in: cgImage) }
             }
         )
         .accessibilityLabel("Nota")

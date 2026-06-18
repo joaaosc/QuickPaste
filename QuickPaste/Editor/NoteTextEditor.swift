@@ -16,6 +16,12 @@ struct NoteTextEditor: NSViewRepresentable {
     var onChange: (NSAttributedString) -> Void
     /// Called after a clipboard image is inserted, so the model can run OCR.
     var onImagePasted: (NSImage) -> Void
+    /// Whether the right-click "Reconhecer texto (OCR)" item is offered.
+    var ocrEnabled: Bool
+    /// Right-click OCR on an existing image.
+    var onRecognizeImage: (NSImage) -> Void
+    /// Integration point for the separate LaTeX module (nil keeps the menu item disabled).
+    var onConvertToLaTeX: ((NSImage) -> Void)? = nil
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = ClipboardTextView()
@@ -28,6 +34,9 @@ struct NoteTextEditor: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 4, height: 8)
         textView.allowMultipleImages = allowMultipleImages
         textView.onImagePasted = onImagePasted
+        textView.ocrMenuEnabled = ocrEnabled
+        textView.onRecognizeImage = onRecognizeImage
+        textView.onConvertImageToLaTeX = onConvertToLaTeX
         textView.typingAttributes[.font] = NSFont.systemFont(ofSize: fontSize)
         textView.textStorage?.setAttributedString(attributedText)
         textView.isVerticallyResizable = true
@@ -47,6 +56,9 @@ struct NoteTextEditor: NSViewRepresentable {
         guard let textView = scrollView.documentView as? ClipboardTextView else { return }
         textView.allowMultipleImages = allowMultipleImages
         textView.onImagePasted = onImagePasted
+        textView.ocrMenuEnabled = ocrEnabled
+        textView.onRecognizeImage = onRecognizeImage
+        textView.onConvertImageToLaTeX = onConvertToLaTeX
         let desiredFont = NSFont.systemFont(ofSize: fontSize)
 
         // External content change (clear / adopt translation / appended OCR text) → push in,
@@ -165,5 +177,71 @@ final class ClipboardTextView: NSTextView {
         }
         let scale = maxWidth / size.width
         return CGRect(x: 0, y: 0, width: maxWidth, height: (size.height * scale).rounded())
+    }
+
+    // MARK: Right-click on an image
+
+    /// Only offer OCR in the menu when the feature is on.
+    var ocrMenuEnabled = false
+    var onRecognizeImage: ((NSImage) -> Void)?
+    /// Integration point for the separate LaTeX/Core AI module. Nil until that module is added,
+    /// which keeps the menu item present but disabled ("em breve").
+    var onConvertImageToLaTeX: ((NSImage) -> Void)?
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let image = image(atContextMenuEvent: event) else {
+            return super.menu(for: event)
+        }
+
+        let menu = NSMenu()
+
+        if ocrMenuEnabled {
+            let ocr = NSMenuItem(title: "Reconhecer texto (OCR)", action: #selector(recognizeImageText(_:)), keyEquivalent: "")
+            ocr.target = self
+            ocr.representedObject = image
+            menu.addItem(ocr)
+        }
+
+        let latexTitle = onConvertImageToLaTeX == nil
+            ? "Converter fórmula para LaTeX (.tex) — em breve"
+            : "Converter fórmula para LaTeX (.tex)…"
+        let latex = NSMenuItem(
+            title: latexTitle,
+            action: onConvertImageToLaTeX == nil ? nil : #selector(convertImageToLaTeX(_:)),
+            keyEquivalent: ""
+        )
+        latex.target = self
+        latex.representedObject = image
+        menu.addItem(latex)   // disabled while the action is nil (separate module not installed)
+
+        return menu.items.isEmpty ? super.menu(for: event) : menu
+    }
+
+    @objc private func recognizeImageText(_ sender: NSMenuItem) {
+        if let image = sender.representedObject as? NSImage { onRecognizeImage?(image) }
+    }
+
+    @objc private func convertImageToLaTeX(_ sender: NSMenuItem) {
+        if let image = sender.representedObject as? NSImage { onConvertImageToLaTeX?(image) }
+    }
+
+    private func image(atContextMenuEvent event: NSEvent) -> NSImage? {
+        guard let storage = textStorage, storage.length > 0 else { return nil }
+        let point = convert(event.locationInWindow, from: nil)
+        let index = characterIndexForInsertion(at: point)
+        for i in [index, index - 1] where i >= 0 && i < storage.length {
+            if let attachment = storage.attribute(.attachment, at: i, effectiveRange: nil) as? NSTextAttachment {
+                return image(from: attachment)
+            }
+        }
+        return nil
+    }
+
+    private func image(from attachment: NSTextAttachment) -> NSImage? {
+        if let image = attachment.image { return image }
+        if let data = attachment.fileWrapper?.regularFileContents, let image = NSImage(data: data) {
+            return image
+        }
+        return nil
     }
 }
