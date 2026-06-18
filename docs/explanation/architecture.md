@@ -2,17 +2,17 @@
 
 ## Visão geral
 QuickPaste é um app SwiftUI **macOS-first** empacotado como utilitário de barra de menus
-(`LSUIElement`). O ciclo de vida e o chrome nativo (status item, painel, atalho global) ficam em
-AppKit; a UI do editor é SwiftUI.
+(`LSUIElement`). O ciclo de vida e o chrome nativo (status item, painel, atalho global, camada de
+janelas) ficam em AppKit; a UI (editor e Settings) é SwiftUI.
 
 ```
 QuickPasteApp (App, cena Settings)
         │  @NSApplicationDelegateAdaptor
         ▼
-AppDelegate ── status item, FloatingPanel (NSPanel), HotKeyManager (Carbon)
+AppDelegate ── status item, FloatingPanel (NSPanel), HotKeyManager (Carbon), camada de janelas
         │  hospeda
         ▼
-EditorView (SwiftUI)
+EditorView (SwiftUI) ── NoteTextEditor (NSTextView rich text)
         │  observa
         ▼
 EditorModel (@Observable, @MainActor)
@@ -22,30 +22,43 @@ NotePersisting · PasteboardWriting · LanguageDetecting   (EditorServices)
 ```
 
 ## MVVM com seams por protocolo
-O editor segue **MVVM**: `EditorModel` é a fonte de verdade (texto, imagem anexada, máquina de
-estados de tradução, idioma detectado). A View não fala com frameworks diretamente — ela depende de
-`EditorModel`, que por sua vez depende de **protocolos** (`NotePersisting`, `PasteboardWriting`,
-`LanguageDetecting`). Isso mantém a View fina e torna o estado testável com fakes (ex.:
-`InMemoryNotePersistence`).
+O editor segue **MVVM**: `EditorModel` é a fonte de verdade (conteúdo rich, máquina de estados de
+tradução, idioma detectado). A View depende de `EditorModel`, que depende de **protocolos**
+(`NotePersisting`, `PasteboardWriting`, `LanguageDetecting`) — mantendo a View fina e o estado
+testável com fakes (`InMemoryNotePersistence`). A persistência é **debounced**; `persistNow()` faz
+flush ao fechar o painel.
 
-A persistência do texto é **debounced** (não grava a cada tecla); `persistNow()` faz flush ao fechar
-o painel.
+## Conteúdo rich text e imagens inline
+A nota é um `NSAttributedString`, então imagens coladas ficam **inline no corpo do texto** como
+`NSTextAttachment`. O editor é um `NSTextView` (`NoteTextEditor`) — escolhido porque o `TextEditor`
+do SwiftUI não permite interceptar o paste nem inserir anexos. No ⌘V, se o clipboard tem **imagem e
+nenhum texto**, inserimos a imagem (escalada à largura) na posição do cursor; o toggle "permitir
+mais de uma imagem" controla se substituímos a anterior. O `plainText` (sem o caractere de anexo
+U+FFFC) alimenta tradução, contagem e detecção. Persistência: **RTFD** (embute as imagens) em
+`UserDefaults`.
 
-## Por que NSTextView para o ⌘V de imagem
-O `TextEditor` do SwiftUI não expõe a interceptação de paste. Para colar **imagem** do clipboard,
-o editor é um `NSTextView` (`NoteTextEditor`) cujo `paste(_:)` desvia uma imagem (quando não há
-texto) para `EditorModel.pasteImage`. O texto continua sendo `String`, então tradução, contagem e
-detecção de idioma não mudaram. Tradução de imagem está fora de escopo.
+## Configurações em abas (modular)
+`SettingsContent` é um `TabView` nativo (Geral, Avançado, Telas, Atalhos, Sobre), cada aba uma view
+modular (`GeneralSettingsView`, `AdvancedSettingsView`, …) usando `Form`/`Section`/`LabeledContent`
+e controles nativos. Deixamos o **sistema** aplicar material/estilo (sem imitar "vidro" à mão).
+Preferências via `@AppStorage` (sem acoplar UI à lógica).
+
+## Camada de janelas (painel acima de tudo, exceto Settings)
+O painel da nota fica em `NSWindow.Level.floating` (acima de todos os apps). Como a janela de
+Settings é a única janela **titulada não-painel** do app, o `AppDelegate` observa o foco de janelas:
+ao Settings virar key, baixa o painel para `.normal` (Settings fica acima); restaura `.floating`
+quando o painel reganha foco ou a Settings fecha. Vale para o item de menu e para o `SettingsLink`.
 
 ## On-device e privacidade
 O app é **sandboxed e sem entitlement de rede**. Tudo roda localmente:
 - **Tradução**: framework `Translation` (on-device, macOS 15+). A `TranslationSession` só é válida
-  dentro do closure do `translationTask` (verificado na doc da Apple), então a View mantém o
-  `translationTask` e o model guarda o estado.
+  dentro do closure do `translationTask`, então a View mantém o `translationTask` e o model guarda o
+  estado. Pode ser desligada em Configurações.
 - **Detecção de idioma**: `NLLanguageRecognizer` (NaturalLanguage), sem download de modelo.
-- **Dados**: nota, imagem e preferências em `UserDefaults`. Conteúdo do clipboard nunca é logado.
+- **OCR**: opção presente, ainda não implementada (seria Vision, on-device).
+- **Dados**: nota (RTFD) e preferências em `UserDefaults`. Conteúdo do clipboard nunca é logado.
 
 ## Testes
-Os testes (Swift Testing, em `QuickPasteTests/`) exercitam o `EditorModel` e o detector com fakes
-via injeção de dependência — sem chamar modelos reais. Veja o
-[EXPERIMENT_REPORT](../EXPERIMENT_REPORT.md) para o estado atual (incl. como conectar o test target).
+Os testes (Swift Testing, em `QuickPasteTests/`) exercitam o `EditorModel` e o detector com fakes via
+injeção de dependência — sem chamar modelos reais. Veja o
+[EXPERIMENT_REPORT](../EXPERIMENT_REPORT.md) para como conectar o test target.
