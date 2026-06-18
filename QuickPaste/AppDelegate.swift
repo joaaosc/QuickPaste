@@ -2,32 +2,47 @@ import AppKit
 import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static let frameAutosaveName = "QuickPasteEditorPanel"
+
     private var statusItem: NSStatusItem?
-    private var editorPanel: NSPanel?
+    private var editorPanel: FloatingPanel?
+    private var hasSavedFrame = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        _ = notification
+        QuickPasteSettings.registerDefaults()
+
         setupStatusItem()
         setupEditorPanel()
 
-        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(activeSpaceDidChange(_:)), name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        HotKeyManager.shared.handler = { [weak self] in
+            self?.toggleEditorPanel()
+        }
+        updateHotKeyRegistration()
 
-        if QuickPasteSettings.defaults.bool(forKey: "openEditorAtLaunch") {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(defaultsDidChange),
+            name: UserDefaults.didChangeNotification,
+            object: nil
+        )
+
+        if QuickPasteSettings.openEditorAtLaunch {
             DispatchQueue.main.async { [weak self] in
                 self?.showEditorPanel()
             }
         }
     }
 
+    // MARK: - Status item
+
     private func setupStatusItem() {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
             button.image = NSImage(
-                systemSymbolName: "text.cursor",
+                systemSymbolName: "note.text",
                 accessibilityDescription: "QuickPaste"
             )
-
             button.action = #selector(statusItemClicked)
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -36,39 +51,90 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusItem = statusItem
     }
 
-    private func setupEditorPanel() {
-        let contentView = MenuBarContent()
-        let hostingController = NSHostingController(rootView: contentView)
+    @objc private func statusItemClicked() {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            showStatusMenu()
+        } else {
+            toggleEditorPanel()
+        }
+    }
 
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
+    private func showStatusMenu() {
+        let menu = NSMenu()
+
+        let toggleTitle = editorPanel?.isVisible == true ? "Ocultar nota" : "Mostrar nota"
+        menu.addItem(withTitle: toggleTitle, action: #selector(menuTogglePanel), keyEquivalent: "")
+            .target = self
+
+        menu.addItem(.separator())
+
+        let settingsItem = menu.addItem(
+            withTitle: "Configurações…",
+            action: #selector(openSettings),
+            keyEquivalent: ","
+        )
+        settingsItem.target = self
+
+        menu.addItem(.separator())
+
+        menu.addItem(
+            withTitle: "Sair do QuickPaste",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+
+        // Menu temporário: mantém o clique esquerdo como toggle do painel.
+        statusItem?.menu = menu
+        statusItem?.button?.performClick(nil)
+        statusItem?.menu = nil
+    }
+
+    @objc private func menuTogglePanel() {
+        toggleEditorPanel()
+    }
+
+    @objc private func openSettings() {
+        NSApp.activate()
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+
+    // MARK: - Editor panel
+
+    private func setupEditorPanel() {
+        let hostingController = NSHostingController(rootView: EditorView())
+
+        let panel = FloatingPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 400),
             styleMask: [
                 .titled,
+                .closable,
                 .resizable,
-                .closable
+                .fullSizeContentView,
+                .nonactivatingPanel,
             ],
             backing: .buffered,
             defer: false
         )
 
         panel.contentViewController = hostingController
+        panel.title = "QuickPaste"
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
-        panel.level = keepEditorFloating ? .floating : .normal
-        panel.minSize = NSSize(width: 520, height: 360)
+        panel.level = .floating
+        panel.minSize = NSSize(width: 360, height: 280)
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
 
-        panel.collectionBehavior = [
-            .canJoinAllSpaces,
-            .fullScreenAuxiliary
-        ]
-
-        panel.title = "QuickPaste"
+        hasSavedFrame = panel.setFrameUsingName(Self.frameAutosaveName)
+        panel.setFrameAutosaveName(Self.frameAutosaveName)
 
         self.editorPanel = panel
-    }
-
-    @objc private func statusItemClicked() {
-        toggleEditorPanel()
     }
 
     private func toggleEditorPanel() {
@@ -82,38 +148,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showEditorPanel() {
-        guard
-            let editorPanel,
-            let button = statusItem?.button,
-            let buttonWindow = button.window
-        else {
-            return
+        guard let editorPanel else { return }
+
+        if !hasSavedFrame {
+            positionPanelBelowStatusItem(editorPanel)
+            hasSavedFrame = true
         }
 
-        editorPanel.level = keepEditorFloating ? .floating : .normal
+        editorPanel.makeKeyAndOrderFront(nil)
+    }
+
+    private func positionPanelBelowStatusItem(_ panel: NSPanel) {
+        guard
+            let button = statusItem?.button,
+            let buttonWindow = button.window
+        else { return }
 
         let buttonFrame = button.convert(button.bounds, to: nil)
         let screenFrame = buttonWindow.convertToScreen(buttonFrame)
-
-        let panelSize = editorPanel.frame.size
+        let panelSize = panel.frame.size
 
         let x = screenFrame.midX - panelSize.width / 2
         let y = screenFrame.minY - panelSize.height - 8
 
-        editorPanel.setFrameOrigin(NSPoint(x: x, y: y))
-        NSApp.activate(ignoringOtherApps: true)
-        editorPanel.makeKeyAndOrderFront(nil)
+        panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
-    private var keepEditorFloating: Bool {
-        QuickPasteSettings.defaults.object(forKey: "keepEditorFloating") as? Bool ?? true
+    // MARK: - Hotkey
+
+    @objc private func defaultsDidChange() {
+        updateHotKeyRegistration()
     }
 
-    @objc private func activeSpaceDidChange(_ notification: Notification) {
-        _ = notification
-        if let editorPanel, editorPanel.isVisible {
-            NSApp.activate(ignoringOtherApps: true)
-            editorPanel.makeKeyAndOrderFront(nil)
+    private func updateHotKeyRegistration() {
+        if QuickPasteSettings.globalHotKeyEnabled {
+            HotKeyManager.shared.register()
+        } else {
+            HotKeyManager.shared.unregister()
         }
     }
 }

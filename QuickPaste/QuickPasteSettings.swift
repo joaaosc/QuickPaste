@@ -1,6 +1,65 @@
 import Foundation
 
 enum QuickPasteSettings {
-    static let appGroupIdentifier = "33FPG9442W.QuickPaste"
-    static let defaults = UserDefaults(suiteName: appGroupIdentifier) ?? .standard
+    enum Key {
+        static let openEditorAtLaunch = "openEditorAtLaunch"
+        static let globalHotKeyEnabled = "globalHotKeyEnabled"
+        static let editorFontSize = "editorFontSize"
+        static let targetLanguage = "targetLanguage"
+        static let noteText = "noteText"
+    }
+
+    static let defaults = UserDefaults.standard
+
+    static func registerDefaults() {
+        defaults.register(defaults: [
+            Key.openEditorAtLaunch: false,
+            Key.globalHotKeyEnabled: true,
+            Key.editorFontSize: 14.0,
+            Key.targetLanguage: TranslationLanguage.english.rawValue,
+        ])
+    }
+
+    static var openEditorAtLaunch: Bool {
+        defaults.bool(forKey: Key.openEditorAtLaunch)
+    }
+
+    static var globalHotKeyEnabled: Bool {
+        defaults.bool(forKey: Key.globalHotKeyEnabled)
+    }
+
+    static var noteText: String {
+        get { defaults.string(forKey: Key.noteText) ?? "" }
+        set { defaults.set(newValue, forKey: Key.noteText) }
+    }
+}
+
+enum TranslationLanguage: String, CaseIterable, Identifiable {
+    case portuguese = "pt-BR"
+    case english = "en-US"
+    case spanish = "es-ES"
+    case french = "fr-FR"
+    case german = "de-DE"
+    case italian = "it-IT"
+    case japanese = "ja-JP"
+    case chinese = "zh-Hans"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .portuguese: "Português"
+        case .english: "Inglês"
+        case .spanish: "Espanhol"
+        case .french: "Francês"
+        case .german: "Alemão"
+        case .italian: "Italiano"
+        case .japanese: "Japonês"
+        case .chinese: "Chinês (simplificado)"
+        }
+    }
+
+    var locale: Locale.Language {
+        Locale.Language(identifier: rawValue)
+    }
 }
