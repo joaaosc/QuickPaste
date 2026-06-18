@@ -40,3 +40,19 @@ e isolado atrás de protocolos** (seams), injetado por DI; **sem trocar a arquit
 - `HANDOFF.md` (este arquivo) — criado.
 - `docs/explanation/ocr-plan.md` — plano de OCR.
 - `docs/README.md` — link para o plano.
+
+### Implementação — Passo 1: módulo OCR (sem fiação)
+Raciocínio: começar pelo módulo isolado, sem tocar no editor, para garantir a API Vision e manter
+o LaTeX como módulo à parte (só o seam).
+Decisões:
+- Seams usam `CGImage` (Sendable; entrada nativa do Vision) → chamadas async cruzam atores limpas.
+- Confirmado no apple-docs: `RecognizeTextRequest` (macOS 15+), `perform(on:)` async,
+  `recognitionLevel`/`usesLanguageCorrection`/`recognitionLanguages: [Locale.Language]`,
+  `RecognizedTextObservation.topCandidates(_:)` → `RecognizedText.string/.confidence`.
+- `FormulaConverting` **declarado, sem impl** (módulo LaTeX/Core AI será separado).
+Arquivos:
+- `Editor/OCR/OCRTypes.swift` — `ImageTextClass` (.noText/.text/.formula), `RecognizedText`.
+- `Editor/OCR/OCRServices.swift` — protocolos `ImageTextClassifying`/`TextRecognizing`/
+  `FormulaConverting` (Sendable) + impls Vision `VisionImageTextClassifier` (gate `.fast`),
+  `VisionTextRecognizer` (`.accurate` + correção).
+Build: `BUILD SUCCEEDED`. Sem fiação ainda (tipos não usados).
