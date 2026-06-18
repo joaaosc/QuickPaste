@@ -8,14 +8,18 @@ struct EditorView: View {
     @AppStorage(QuickPasteSettings.Key.targetLanguage)
     private var targetLanguageRaw = TranslationLanguage.english.rawValue
 
-    @State private var text: String = QuickPasteSettings.noteText
-    @State private var translationConfig: TranslationSession.Configuration?
-    @State private var translatedText: String?
-    @State private var translationError: String?
-    @State private var isTranslating = false
+    @State private var model: EditorModel
     @State private var didCopy = false
 
     @FocusState private var editorFocused: Bool
+
+    init() {
+        _model = State(initialValue: EditorModel())
+    }
+
+    init(model: EditorModel) {
+        _model = State(initialValue: model)
+    }
 
     private var targetLanguage: TranslationLanguage {
         TranslationLanguage(rawValue: targetLanguageRaw) ?? .english
@@ -25,7 +29,7 @@ struct EditorView: View {
         VStack(spacing: 0) {
             editor
 
-            if isTranslating || translatedText != nil || translationError != nil {
+            if model.translation.isActive {
                 translationCard
             }
 
@@ -34,44 +38,44 @@ struct EditorView: View {
             bottomBar
         }
         .background(VisualEffectBackground().ignoresSafeArea())
-        .translationTask(translationConfig) { session in
+        .translationTask(model.translationConfiguration) { session in
             do {
-                let response = try await session.translate(text)
-                translatedText = response.targetText
-                translationError = nil
+                let response = try await session.translate(model.pendingSourceText)
+                model.finishTranslation(response.targetText)
             } catch {
-                translatedText = nil
-                translationError = error.localizedDescription
+                model.failTranslation(error.localizedDescription)
             }
-            isTranslating = false
-        }
-        .onChange(of: text) { _, newValue in
-            QuickPasteSettings.noteText = newValue
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             if notification.object is FloatingPanel {
                 editorFocused = true
             }
         }
+        .onDisappear { model.persistNow() }
     }
 
     // MARK: - Editor
 
     private var editor: some View {
-        TextEditor(text: $text)
+        @Bindable var model = model
+
+        return TextEditor(text: $model.text)
             .font(.system(size: fontSize))
             .scrollContentBackground(.hidden)
             .focused($editorFocused)
             .padding(.horizontal, 8)
             .padding(.bottom, 4)
+            .accessibilityLabel("Nota")
+            .onChange(of: model.text) { model.handleTextChanged() }
             .overlay(alignment: .topLeading) {
-                if text.isEmpty {
+                if model.isEmpty {
                     Text("Escreva algo…")
                         .font(.system(size: fontSize))
                         .foregroundStyle(.tertiary)
                         .padding(.horizontal, 13)
                         .padding(.top, 1)
                         .allowsHitTesting(false)
+                        .accessibilityHidden(true)
                 }
             }
     }
@@ -87,28 +91,29 @@ struct EditorView: View {
 
                 Spacer()
 
-                if isTranslating {
+                if model.translation.isInProgress {
                     ProgressView()
                         .controlSize(.small)
                 }
 
                 Button {
-                    dismissTranslation()
+                    model.dismissTranslation()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
                 .help("Fechar tradução")
+                .accessibilityLabel("Fechar tradução")
             }
 
-            if let translationError {
-                Text(translationError)
+            if let message = model.translation.errorMessage {
+                Text(message)
                     .font(.callout)
                     .foregroundStyle(.red)
-            } else if let translatedText {
+            } else if let result = model.translation.result {
                 ScrollView {
-                    Text(translatedText)
+                    Text(result)
                         .font(.system(size: fontSize))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -117,12 +122,11 @@ struct EditorView: View {
 
                 HStack(spacing: 8) {
                     Button("Copiar tradução") {
-                        copyToPasteboard(translatedText)
+                        model.copyTranslation()
                     }
 
                     Button("Substituir nota") {
-                        text = translatedText
-                        dismissTranslation()
+                        model.adoptTranslation()
                     }
                 }
                 .controlSize(.small)
@@ -140,11 +144,19 @@ struct EditorView: View {
     // MARK: - Barra inferior
 
     private var bottomBar: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             Text(statsText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+
+            if let detected = model.detectedLanguage {
+                Label(detected.displayName, systemImage: "character.bubble")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help("Idioma detectado on-device")
+                    .accessibilityLabel("Idioma detectado: \(detected.displayName)")
+            }
 
             Spacer()
 
@@ -159,16 +171,17 @@ struct EditorView: View {
             .help("Idioma de destino da tradução")
 
             Button {
-                translate()
+                model.requestTranslation(to: targetLanguage)
             } label: {
                 Image(systemName: "globe")
             }
             .buttonStyle(.borderless)
-            .disabled(text.isEmpty || isTranslating)
+            .disabled(model.isEmpty || model.translation.isInProgress)
             .help("Traduzir nota")
+            .accessibilityLabel("Traduzir nota")
 
             Button {
-                copyToPasteboard(text)
+                model.copyNote()
                 withAnimation { didCopy = true }
                 Task {
                     try? await Task.sleep(for: .seconds(1.2))
@@ -179,59 +192,27 @@ struct EditorView: View {
                     .foregroundStyle(didCopy ? .green : .primary)
             }
             .buttonStyle(.borderless)
-            .disabled(text.isEmpty)
+            .disabled(model.isEmpty)
             .help("Copiar nota inteira")
+            .accessibilityLabel(didCopy ? "Copiado" : "Copiar nota")
 
             Button {
-                text = ""
-                dismissTranslation()
+                model.clear()
                 editorFocused = true
             } label: {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
-            .disabled(text.isEmpty)
+            .disabled(model.isEmpty)
             .help("Limpar nota")
+            .accessibilityLabel("Limpar nota")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
     }
 
     private var statsText: String {
-        let words = text.split(whereSeparator: \.isWhitespace).count
-        return "\(words) palavras · \(text.count) caracteres"
-    }
-
-    // MARK: - Ações
-
-    private func translate() {
-        guard !text.isEmpty else { return }
-
-        translationError = nil
-        isTranslating = true
-
-        if var config = translationConfig {
-            config.target = targetLanguage.locale
-            config.invalidate()
-            translationConfig = config
-        } else {
-            translationConfig = TranslationSession.Configuration(
-                source: nil,
-                target: targetLanguage.locale
-            )
-        }
-    }
-
-    private func dismissTranslation() {
-        translatedText = nil
-        translationError = nil
-        isTranslating = false
-    }
-
-    private func copyToPasteboard(_ string: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(string, forType: .string)
+        "\(model.wordCount) palavras · \(model.characterCount) caracteres"
     }
 }
 
@@ -247,7 +228,13 @@ private struct VisualEffectBackground: NSViewRepresentable {
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
-#Preview {
-    EditorView()
+#Preview("Vazia") {
+    EditorView(model: EditorModel(persistence: InMemoryNotePersistence()))
         .frame(width: 480, height: 400)
+}
+
+#Preview("Com texto · escuro") {
+    EditorView(model: EditorModel(persistence: InMemoryNotePersistence(note: "Olá, mundo!\nEsta é uma nota de exemplo.")))
+        .frame(width: 480, height: 400)
+        .preferredColorScheme(.dark)
 }

@@ -2,20 +2,6 @@ import Foundation
 import Observation
 import Translation
 
-/// The state of an in-flight or finished translation. A small explicit state
-/// machine instead of three loose optionals, so the view renders one case at a time.
-enum TranslationOutcome: Equatable {
-    case idle
-    case inProgress
-    case completed(String)
-    case failed(String)
-
-    var isInProgress: Bool { self == .inProgress }
-    var isActive: Bool { self != .idle }
-    var result: String? { if case let .completed(value) = self { return value } else { return nil } }
-    var errorMessage: String? { if case let .failed(message) = self { return message } else { return nil } }
-}
-
 /// Owns the scratchpad's state and orchestrates translation, keeping `EditorView` thin.
 ///
 /// SwiftUI-coupled bits stay in the view by design: `translationTask` provides a
@@ -28,7 +14,9 @@ enum TranslationOutcome: Equatable {
 final class EditorModel {
     // MARK: Observable state
 
-    private(set) var text: String
+    /// The note text. The view binds to this directly (`$model.text`) and reports
+    /// edits via `handleTextChanged()` from `.onChange`.
+    var text: String
     private(set) var detectedLanguage: TranslationLanguage?
     private(set) var translation: TranslationOutcome = .idle
 
@@ -76,11 +64,10 @@ final class EditorModel {
 
     // MARK: Editing
 
-    /// Single entry point for text edits: updates state, then debounces persistence
-    /// and language detection so we neither write to disk nor re-detect on every keystroke.
-    func setText(_ newValue: String) {
-        guard newValue != text else { return }
-        text = newValue
+    /// React to a text change (the view calls this from `.onChange(of:)`). Debounces
+    /// persistence and language detection so we neither write to disk nor re-detect
+    /// on every keystroke.
+    func handleTextChanged() {
         schedulePersist()
         scheduleDetect()
     }
@@ -152,7 +139,7 @@ final class EditorModel {
     /// Replace the note with the translation (user-initiated, never automatic).
     func adoptTranslation() {
         guard let value = translation.result else { return }
-        setText(value)
+        text = value
         dismissTranslation()
     }
 
@@ -171,7 +158,7 @@ final class EditorModel {
     // MARK: Clearing
 
     func clear() {
-        setText("")
+        text = ""
         dismissTranslation()
     }
 }

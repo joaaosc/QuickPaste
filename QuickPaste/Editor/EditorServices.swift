@@ -14,7 +14,7 @@ protocol NotePersisting: AnyObject {
     var note: String { get set }
 }
 
-final class UserDefaultsNotePersistence: NotePersisting {
+nonisolated final class UserDefaultsNotePersistence: NotePersisting {
     private let defaults: UserDefaults
     private let key: String
 
@@ -29,6 +29,12 @@ final class UserDefaultsNotePersistence: NotePersisting {
     }
 }
 
+/// In-memory note store for SwiftUI previews and unit tests (no UserDefaults side effects).
+nonisolated final class InMemoryNotePersistence: NotePersisting {
+    var note: String
+    init(note: String = "") { self.note = note }
+}
+
 // MARK: - Pasteboard
 
 /// Write-only pasteboard seam — QuickPaste only ever *writes* the note out.
@@ -36,7 +42,7 @@ protocol PasteboardWriting {
     func write(_ string: String)
 }
 
-struct SystemPasteboard: PasteboardWriting {
+nonisolated struct SystemPasteboard: PasteboardWriting {
     func write(_ string: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -53,7 +59,7 @@ protocol LanguageDetecting {
     func detect(in text: String) -> TranslationLanguage?
 }
 
-struct NaturalLanguageDetector: LanguageDetecting {
+nonisolated struct NaturalLanguageDetector: LanguageDetecting {
     /// Below this many characters detection is too noisy to be useful, so we abstain.
     var minimumCharacters = 8
 

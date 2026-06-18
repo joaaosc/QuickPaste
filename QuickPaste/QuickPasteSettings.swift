@@ -27,11 +27,6 @@ enum QuickPasteSettings {
     static var globalHotKeyEnabled: Bool {
         defaults.bool(forKey: Key.globalHotKeyEnabled)
     }
-
-    static var noteText: String {
-        get { defaults.string(forKey: Key.noteText) ?? "" }
-        set { defaults.set(newValue, forKey: Key.noteText) }
-    }
 }
 
 enum TranslationLanguage: String, CaseIterable, Identifiable {
