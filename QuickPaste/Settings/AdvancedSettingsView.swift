@@ -31,11 +31,11 @@ struct AdvancedSettingsView: View {
             }
 
             Section {
-                Toggle("Habilitar OCR", isOn: $ocrEnabled)
+                Toggle("Reconhecer texto em imagens (OCR)", isOn: $ocrEnabled)
             } header: {
-                Text("Reconhecimento de texto (OCR)")
+                Text("OCR em imagens")
             } footer: {
-                Text("Em breve — a opção é salva, mas ainda não tem efeito.")
+                Text("Em breve — a opção é salva, mas o reconhecimento será implementado com Vision.")
                     .foregroundStyle(.secondary)
             }
         }
