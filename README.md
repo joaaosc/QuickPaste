@@ -1,66 +1,71 @@
 # QuickPaste
 
-QuickPaste é um app de barra de menus para macOS que mantém uma nota rápida sempre acessível. Ele abre um painel flutuante estilo Spotlight, permite editar texto, copiar o conteúdo para a área de transferência e traduzir a nota pelo framework Translation da Apple.
+QuickPaste é um app de **barra de menus para macOS**: um bloco de rascunho sempre à mão, em um
+painel flutuante estilo Spotlight. Edite texto, **cole imagens do clipboard (⌘V)**, copie o
+conteúdo e traduza a nota com o framework on-device **Translation** da Apple.
 
 ## Recursos
 
-- Ícone na barra de menus com clique esquerdo para mostrar/ocultar a nota.
-- Menu contextual com acesso às configurações e saída do app.
-- Painel flutuante redimensionável com autosave de posição e tamanho.
-- Atalho global `Control + Option + Space`.
-- Editor com contagem de palavras/caracteres e tamanho de fonte configurável.
-- Persistência local da nota em `UserDefaults`.
-- Tradução para português, inglês, espanhol, francês, alemão, italiano, japonês e chinês simplificado.
-- Opção para abrir a nota ao iniciar o app e iniciar o app no login.
+- Ícone na barra de menus: clique esquerdo mostra/oculta a nota; clique direito abre o menu.
+- Painel flutuante (NSPanel) redimensionável e não-ativador, com autosave de posição/tamanho.
+- Atalho global **⌃⌥Espaço** para mostrar/ocultar.
+- Editor com contagem de palavras/caracteres, tamanho de fonte ajustável e **detecção de idioma
+  on-device** (NaturalLanguage).
+- **Colar imagem do clipboard com ⌘V** — a imagem vira um anexo na nota (tradução de imagem está
+  fora de escopo por enquanto).
+- Tradução on-device para 8 idiomas.
+- Persistência local da nota e da imagem em `UserDefaults`.
+- Abrir a nota ao iniciar o app e iniciar o app no login.
 
 ## Requisitos
 
-- macOS com suporte ao framework `Translation`.
-- Xcode 26.5 ou superior, conforme configuração atual do projeto.
-- Conta de desenvolvimento Apple configurada no Xcode para assinatura automática.
+- macOS 26.5+ (deployment target do projeto), com o framework `Translation`.
+- Xcode 26.5+/27 (compila no SDK macOS 27). Conta de desenvolvedor para assinatura automática.
 
 ## Como rodar
 
-Abra `QuickPaste.xcodeproj` no Xcode e execute o scheme `QuickPaste`.
-
-Pela linha de comando:
+Abra `QuickPaste.xcodeproj` no Xcode e rode o scheme `QuickPaste`, ou pela linha de comando:
 
 ```sh
-xcodebuild -project QuickPaste.xcodeproj \
-  -scheme QuickPaste \
-  -configuration Debug \
-  -derivedDataPath .deriveddata \
-  build
+xcodebuild -project QuickPaste.xcodeproj -scheme QuickPaste -configuration Debug \
+  -derivedDataPath .deriveddata build
 ```
 
-O build local usa `.deriveddata/`, que é ignorado pelo Git.
+`.deriveddata/` é ignorado pelo Git.
+
+## Como abrir as configurações
+
+O app é "agent" (sem ícone no Dock), então o config abre pelo menu da barra de menus:
+**clique direito (ou Control-clique) no ícone do QuickPaste ▸ "Configurações…"** (ou ⌘, com uma
+janela do app ativa). Passo a passo em [docs/how-to/open-settings.md](docs/how-to/open-settings.md).
+
+## Documentação
+
+A documentação segue o modelo [Diátaxis](https://diataxis.fr) — comece por **[docs/](docs/README.md)**:
+tutorial, how-tos, referência e explicação.
 
 ## Estrutura
 
 ```text
 QuickPaste/
-  AppDelegate.swift          Ciclo de vida, status item, painel e atalho global.
-  EditorView.swift           Editor principal, ações de copiar/limpar e tradução.
-  FloatingPanel.swift        NSPanel customizado para comportamento flutuante.
-  HotKeyManager.swift        Registro do atalho global via Carbon.
-  QuickPasteApp.swift        Entrada SwiftUI do app.
-  QuickPasteSettings.swift   Chaves, defaults e idiomas suportados.
+  QuickPasteApp.swift        Entrada SwiftUI (cena Settings + AppDelegate).
+  AppDelegate.swift          Status item, painel flutuante e atalho global.
+  FloatingPanel.swift        NSPanel não-ativador + roteamento de ⌘-teclas.
+  HotKeyManager.swift        Atalho global via Carbon.
   SettingsContent.swift      Tela de configurações.
-docs/
-  RELEASE_CHECKLIST.md       Checklist para preparar uma release.
-```
-
-## Git
-
-O branch de trabalho atual é `AppKit-version`. A versão final esperada consolida o app em um único target `QuickPaste`, remove o target auxiliar `QuickPasteConfig` e mantém o scheme `QuickPaste` compartilhado em `QuickPaste.xcodeproj/xcshareddata/xcschemes/`.
-
-Antes de fechar uma release:
-
-```sh
-git status --short --branch
-xcodebuild -project QuickPaste.xcodeproj -scheme QuickPaste -configuration Release -derivedDataPath .deriveddata build
+  QuickPasteSettings.swift   Chaves/defaults e idiomas suportados.
+  EditorView.swift           UI do editor.
+  Editor/
+    EditorModel.swift        Estado/orquestração (MVVM, @Observable).
+    EditorServices.swift     Seams: persistência, pasteboard, detecção de idioma.
+    NoteTextEditor.swift     Editor NSTextView (intercepta ⌘V de imagem).
+    TranslationOutcome.swift Estado da tradução.
+QuickPasteTests/             Testes (Swift Testing).
+docs/                        Documentação (Diátaxis).
 ```
 
 ## Privacidade
 
-A nota e preferências ficam em `UserDefaults` no dispositivo. O app não adiciona backend próprio nem grava arquivos de usuário diretamente.
+Tudo é **on-device**: nota, imagem e preferências ficam em `UserDefaults`; tradução e detecção de
+idioma rodam localmente. O app é sandboxed e **sem entitlement de rede**. Detalhes em
+[docs/explanation/architecture.md](docs/explanation/architecture.md).
