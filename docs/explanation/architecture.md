@@ -58,9 +58,9 @@ registra via Carbon (`RegisterEventHotKey`) o atalho **fixo ⌃⌥Espaço** (se 
 + string de exibição em `UserDefaults`. Ambos chamam o mesmo handler (alternar a nota).
 
 ## Liquid Glass
-macOS 26+: o editor usa estilos de botão `.glass`/`.glassProminent` (engrenagem prominente para
-destaque) e `.glassEffect(_:in:)` no cartão de tradução; o Sobre tem um cabeçalho em glass.
-Seguindo a HIG, deixamos o **sistema** aplicar material/interação em vez de imitar vidro à mão.
+macOS 26+: `.glassEffect(_:in:)` no cartão de tradução e no cabeçalho do Sobre. Os ícones da toolbar
+do editor são `.borderless` (sem caixa). Seguindo a HIG, deixamos o **sistema** aplicar material em
+vez de imitar vidro à mão.
 
 ## On-device e privacidade
 O app é **sandboxed e sem entitlement de rede**. Tudo roda localmente:

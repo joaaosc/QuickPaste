@@ -14,8 +14,8 @@
 | **⌘Q** | Sair do QuickPaste | App |
 | **Esc** | Ocultar o painel | Painel |
 
-Ações da barra inferior: abrir configurações (⚙︎, botão glass prominente), traduzir (🌐), copiar
-nota (⧉), limpar (🗑) e o seletor de idioma de destino.
+Ações da barra inferior: abrir configurações (⚙︎), traduzir (🌐), copiar nota (⧉), limpar (🗑) e o
+seletor de idioma de destino.
 
 ## Configurações (abas)
 

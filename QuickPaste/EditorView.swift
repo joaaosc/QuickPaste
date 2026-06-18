@@ -149,11 +149,10 @@ struct EditorView: View {
     private var bottomBar: some View {
         HStack(spacing: 12) {
             SettingsLink {
-                Image(systemName: "gearshape.fill")
+                Image(systemName: "gearshape")
                     .fontWeight(.semibold)
-                    .imageScale(.large)
             }
-            .buttonStyle(.glassProminent)
+            .buttonStyle(.borderless)
             .help("Configurações")
             .accessibilityLabel("Configurações")
 
@@ -188,7 +187,7 @@ struct EditorView: View {
                 } label: {
                     Image(systemName: "globe")
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.borderless)
                 .disabled(model.isEmpty || model.translation.isInProgress)
                 .help("Traduzir nota")
                 .accessibilityLabel("Traduzir nota")
@@ -205,7 +204,7 @@ struct EditorView: View {
                 Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
                     .foregroundStyle(didCopy ? .green : .primary)
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.borderless)
             .disabled(model.isEmpty)
             .help("Copiar nota inteira")
             .accessibilityLabel(didCopy ? "Copiado" : "Copiar nota")
@@ -216,7 +215,7 @@ struct EditorView: View {
             } label: {
                 Image(systemName: "trash")
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.borderless)
             .disabled(!model.hasContent)
             .help("Limpar nota")
             .accessibilityLabel("Limpar nota")

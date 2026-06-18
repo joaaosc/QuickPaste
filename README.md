@@ -10,14 +10,14 @@ nota**, copie o conteúdo e traduza a nota com o framework on-device **Translati
 - Painel flutuante (NSPanel) **acima de todos os apps** — exceto a janela de Configurações, que
   abre como janela ativa, acima dele.
 - Atalho global **⌃⌥Espaço** + **atalho personalizado** opcional (Configurações ▸ Atalhos).
-- **Liquid Glass** (macOS 26) na toolbar do editor, no cartão de tradução e no Sobre.
+- **Liquid Glass** (macOS 26) no cartão de tradução e no cabeçalho do Sobre.
 - Editor com contagem de palavras/caracteres, tamanho de fonte ajustável e **detecção de idioma
   on-device** (NaturalLanguage).
 - **Colar imagem do clipboard com ⌘V**, inline no corpo do texto. Opcionalmente **mais de uma
   imagem** (Configurações ▸ Avançado).
 - Tradução on-device para 8 idiomas (pode ser desligada em Configurações).
 - **OCR em imagens**: opção presente em Configurações, **ainda não implementada** (será com Vision).
-- Botão de engrenagem (glass prominente) no editor que abre as Configurações.
+- Botão de engrenagem no editor (canto inferior) que abre as Configurações.
 - Configurações em abas: **Geral, Avançado, Telas, Atalhos, Sobre**.
 - Persistência local da nota (RTFD, incl. imagens) e preferências em `UserDefaults`.
 - Abrir a nota ao iniciar o app e iniciar o app no login.

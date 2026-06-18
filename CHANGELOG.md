@@ -2,8 +2,8 @@
 
 ## Não lançado
 
-- **Liquid Glass** (macOS 26) na toolbar do editor, no cartão de tradução e no cabeçalho do Sobre;
-  botão de Configurações (engrenagem) prominente para maior visibilidade.
+- **Liquid Glass** (macOS 26) no cartão de tradução e no cabeçalho do Sobre. (Os ícones da toolbar
+  permanecem borderless, sem caixa.)
 - A janela de **Configurações abre como janela ativa, acima de tudo** (inclusive da nota).
 - **Atalho global personalizado** para mostrar/ocultar a nota (gravador na aba Atalhos; vazio por
   padrão; funciona junto do ⌃⌥Espaço).
