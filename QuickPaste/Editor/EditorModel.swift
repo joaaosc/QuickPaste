@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Foundation
 import Observation
 import Translation
@@ -32,6 +33,8 @@ final class EditorModel {
     private let persistence: NotePersisting
     private let pasteboard: PasteboardWriting
     private let detector: LanguageDetecting
+    private let classifier: ImageTextClassifying
+    private let recognizer: TextRecognizing
     private let persistDebounce: Duration
     private let detectDebounce: Duration
 
@@ -42,12 +45,16 @@ final class EditorModel {
         persistence: NotePersisting = UserDefaultsNotePersistence(),
         pasteboard: PasteboardWriting = SystemPasteboard(),
         detector: LanguageDetecting = NaturalLanguageDetector(),
+        classifier: ImageTextClassifying = VisionImageTextClassifier(),
+        recognizer: TextRecognizing = VisionTextRecognizer(),
         persistDebounce: Duration = .milliseconds(400),
         detectDebounce: Duration = .milliseconds(300)
     ) {
         self.persistence = persistence
         self.pasteboard = pasteboard
         self.detector = detector
+        self.classifier = classifier
+        self.recognizer = recognizer
         self.persistDebounce = persistDebounce
         self.detectDebounce = detectDebounce
 
@@ -173,6 +180,47 @@ final class EditorModel {
         detectedLanguage = nil
         persistNow()
         dismissTranslation()
+    }
+
+    // MARK: OCR (text in images)
+
+    /// Auto-OCR after pasting an image (gated by the OCR setting). Classifies first to avoid
+    /// running accurate OCR on images without text.
+    func handlePastedImage(_ image: CGImage) async {
+        guard QuickPasteSettings.ocrEnabled else { return }
+        switch await classifier.classify(image) {
+        case .text:
+            await runRecognition(on: image)
+        case .formula:
+            break   // reserved for the separate LaTeX-conversion module (Core AI)
+        case .noText:
+            break
+        }
+    }
+
+    /// Explicit OCR (e.g. right-click on an image) — skips the viability gate.
+    func recognizeText(in image: CGImage) async {
+        guard QuickPasteSettings.ocrEnabled else { return }
+        await runRecognition(on: image)
+    }
+
+    private func runRecognition(on image: CGImage) async {
+        guard let recognized = try? await recognizer.recognize(in: image), !recognized.isEmpty else { return }
+        appendRecognizedText(recognized.text)
+    }
+
+    /// Append recognized text to the note (non-destructive: keeps the image).
+    private func appendRecognizedText(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let mutable = NSMutableAttributedString(attributedString: attributedText)
+        if mutable.length > 0 {
+            mutable.append(NSAttributedString(string: "\n"))
+        }
+        mutable.append(NSAttributedString(string: trimmed))
+        attributedText = mutable
+        persistNow()
+        detectedLanguage = detector.detect(in: plainText)
     }
 
     // MARK: RTFD helpers

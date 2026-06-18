@@ -67,7 +67,11 @@ struct EditorView: View {
             fontSize: CGFloat(fontSize),
             allowMultipleImages: allowMultipleImages,
             focusToken: focusToken,
-            onChange: { model.updateContent($0) }
+            onChange: { model.updateContent($0) },
+            onImagePasted: { image in
+                guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+                Task { await model.handlePastedImage(cgImage) }
+            }
         )
         .accessibilityLabel("Nota")
         .overlay(alignment: .topLeading) { placeholder }

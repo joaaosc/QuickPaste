@@ -41,6 +41,10 @@ enum QuickPasteSettings {
         defaults.bool(forKey: Key.globalHotKeyEnabled)
     }
 
+    static var ocrEnabled: Bool {
+        defaults.bool(forKey: Key.ocrEnabled)
+    }
+
     /// The user's custom global shortcut (Carbon key code + modifiers), or nil when unset.
     static var customHotKey: (keyCode: UInt32, carbonModifiers: UInt32)? {
         let code = defaults.integer(forKey: Key.customHotKeyKeyCode)

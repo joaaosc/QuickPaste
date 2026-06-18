@@ -14,6 +14,8 @@ struct NoteTextEditor: NSViewRepresentable {
     /// Bumped by the parent to request first-responder focus (initial, on key, after clear).
     var focusToken: Int
     var onChange: (NSAttributedString) -> Void
+    /// Called after a clipboard image is inserted, so the model can run OCR.
+    var onImagePasted: (NSImage) -> Void
 
     func makeNSView(context: Context) -> NSScrollView {
         let textView = ClipboardTextView()
@@ -25,6 +27,7 @@ struct NoteTextEditor: NSViewRepresentable {
         textView.backgroundColor = .clear
         textView.textContainerInset = NSSize(width: 4, height: 8)
         textView.allowMultipleImages = allowMultipleImages
+        textView.onImagePasted = onImagePasted
         textView.typingAttributes[.font] = NSFont.systemFont(ofSize: fontSize)
         textView.textStorage?.setAttributedString(attributedText)
         textView.isVerticallyResizable = true
@@ -43,15 +46,26 @@ struct NoteTextEditor: NSViewRepresentable {
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? ClipboardTextView else { return }
         textView.allowMultipleImages = allowMultipleImages
+        textView.onImagePasted = onImagePasted
         let desiredFont = NSFont.systemFont(ofSize: fontSize)
 
-        // External content change (clear / adopt translation) → push into the view.
+        // External content change (clear / adopt translation / appended OCR text) → push in,
+        // normalize the font across it, and sync the normalized value back to the model so the
+        // next pass sees them as equal (no re-push loop).
         if !textView.attributedString().isEqual(to: attributedText) {
             let selected = textView.selectedRange()
             textView.textStorage?.setAttributedString(attributedText)
+            if let storage = textView.textStorage, storage.length > 0 {
+                storage.addAttribute(.font, value: desiredFont, range: NSRange(location: 0, length: storage.length))
+            }
             textView.typingAttributes[.font] = desiredFont
             let length = (textView.string as NSString).length
             textView.setSelectedRange(NSRange(location: min(selected.location, length), length: 0))
+
+            let snapshot = textView.attributedString()
+            if !snapshot.isEqual(to: attributedText) {
+                DispatchQueue.main.async { onChange(snapshot) }
+            }
         }
 
         // Font-size change → reformat existing text uniformly and sync the model.
@@ -91,6 +105,7 @@ struct NoteTextEditor: NSViewRepresentable {
 /// the pasteboard holds an image and no text. Honors single- vs multi-image preference.
 final class ClipboardTextView: NSTextView {
     var allowMultipleImages = false
+    var onImagePasted: ((NSImage) -> Void)?
 
     override func paste(_ sender: Any?) {
         let pasteboard = NSPasteboard.general
@@ -120,6 +135,7 @@ final class ClipboardTextView: NSTextView {
         textStorage?.replaceCharacters(in: range, with: attributed)
         didChangeText()
         setSelectedRange(NSRange(location: range.location + attributed.length, length: 0))
+        onImagePasted?(image)
     }
 
     private func removeAllImageAttachments() {

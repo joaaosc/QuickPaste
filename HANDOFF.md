@@ -56,3 +56,20 @@ Arquivos:
   `FormulaConverting` (Sendable) + impls Vision `VisionImageTextClassifier` (gate `.fast`),
   `VisionTextRecognizer` (`.accurate` + correção).
 Build: `BUILD SUCCEEDED`. Sem fiação ainda (tipos não usados).
+
+### Implementação — Passo 2: auto-OCR ao colar (gated por `ocrEnabled`)
+Raciocínio: o `EditorModel` orquestra (MVVM); a View só converte a imagem e dispara. Texto
+reconhecido é **anexado** (não-destrutivo, mantém a imagem). LaTeX continua fora (case `.formula`
+reservado, sem ação).
+Decisões:
+- `EditorModel` recebe `classifier`/`recognizer` por DI (defaults Vision); `handlePastedImage`
+  (classifica → reconhece se `.text`), `recognizeText` (explícito, sem gate de classificação),
+  `appendRecognizedText` (anexa com `\n`, persiste, redetecta idioma). Tudo gated por `ocrEnabled`.
+- `QuickPasteSettings.ocrEnabled` accessor adicionado.
+- `ClipboardTextView.onImagePasted` chama de volta após inserir a imagem; `EditorView` converte
+  `NSImage`→`CGImage` e chama `model.handlePastedImage` num `Task`.
+- **Correção de fonte**: `NoteTextEditor.updateNSView` agora normaliza a fonte em todo push externo
+  (clear/adopt/texto do OCR) e sincroniza de volta (sem loop) — assim o texto anexado herda a fonte.
+Arquivos: `EditorModel.swift`, `QuickPasteSettings.swift`, `NoteTextEditor.swift`, `EditorView.swift`.
+Build: `BUILD SUCCEEDED`, sem warnings de Sendable/isolamento.
+Pendente de runtime: não testado na GUI (colar imagem com texto → ver o texto anexado).
