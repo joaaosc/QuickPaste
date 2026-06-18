@@ -11,6 +11,9 @@ enum QuickPasteSettings {
         static let translationEnabled = "translationEnabled"
         static let ocrEnabled = "ocrEnabled"
         static let allowMultipleImages = "allowMultipleImages"
+        static let customHotKeyKeyCode = "customHotKeyKeyCode"
+        static let customHotKeyModifiers = "customHotKeyModifiers"
+        static let customHotKeyDisplay = "customHotKeyDisplay"
     }
 
     static let defaults = UserDefaults.standard
@@ -24,6 +27,9 @@ enum QuickPasteSettings {
             Key.translationEnabled: true,
             Key.ocrEnabled: false,
             Key.allowMultipleImages: false,
+            Key.customHotKeyKeyCode: -1,
+            Key.customHotKeyModifiers: 0,
+            Key.customHotKeyDisplay: "",
         ])
     }
 
@@ -33,6 +39,14 @@ enum QuickPasteSettings {
 
     static var globalHotKeyEnabled: Bool {
         defaults.bool(forKey: Key.globalHotKeyEnabled)
+    }
+
+    /// The user's custom global shortcut (Carbon key code + modifiers), or nil when unset.
+    static var customHotKey: (keyCode: UInt32, carbonModifiers: UInt32)? {
+        let code = defaults.integer(forKey: Key.customHotKeyKeyCode)
+        guard code >= 0 else { return nil }
+        let modifiers = defaults.integer(forKey: Key.customHotKeyModifiers)
+        return (UInt32(code), UInt32(modifiers))
     }
 }
 

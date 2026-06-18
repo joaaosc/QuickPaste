@@ -238,10 +238,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateHotKeyRegistration() {
-        if QuickPasteSettings.globalHotKeyEnabled {
-            HotKeyManager.shared.register()
-        } else {
-            HotKeyManager.shared.unregister()
-        }
+        HotKeyManager.shared.reload()
     }
 }

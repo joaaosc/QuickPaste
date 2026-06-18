@@ -1,10 +1,42 @@
 import SwiftUI
 
 struct ShortcutsSettingsView: View {
+    @AppStorage(QuickPasteSettings.Key.customHotKeyKeyCode)
+    private var customKeyCode = -1
+
+    @AppStorage(QuickPasteSettings.Key.customHotKeyModifiers)
+    private var customModifiers = 0
+
+    @AppStorage(QuickPasteSettings.Key.customHotKeyDisplay)
+    private var customDisplay = ""
+
     var body: some View {
         Form {
-            Section("Globais") {
-                LabeledContent("Mostrar/ocultar a nota", value: "⌃⌥Espaço")
+            Section {
+                LabeledContent("Mostrar/ocultar a nota") {
+                    HStack(spacing: 8) {
+                        ShortcutRecorder(
+                            keyCode: $customKeyCode,
+                            carbonModifiers: $customModifiers,
+                            display: $customDisplay
+                        )
+                        .frame(width: 150, height: 24)
+
+                        if !customDisplay.isEmpty {
+                            Button("Limpar") {
+                                customKeyCode = -1
+                                customModifiers = 0
+                                customDisplay = ""
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+            } header: {
+                Text("Atalho personalizado")
+            } footer: {
+                Text("Vazio por padrão. Clique para gravar (precisa de um modificador). Funciona junto do atalho fixo ⌃⌥Espaço.")
+                    .foregroundStyle(.secondary)
             }
 
             Section("No editor") {
