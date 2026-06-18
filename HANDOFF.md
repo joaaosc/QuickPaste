@@ -1,0 +1,42 @@
+# HANDOFF — log de raciocínio e mudanças
+
+Log cronológico a partir da etapa do OCR (branch `feature/ocr-vision`). Registra **todo** raciocínio
+e mudança, para continuar o desenvolvimento fora do Claude. Mais recente no topo de cada data.
+
+---
+
+## 2026-06-18 — branch `feature/ocr-vision` (planejamento do OCR)
+
+**Antes de ramificar (na `main`):** revertidas as caixas (Liquid Glass) nos ícones da toolbar do
+editor — voltaram a `.borderless` (commit `09f4f80`). Glass mantido só no cartão de tradução e no
+cabeçalho do Sobre (não-ícones). Docs alinhadas.
+
+**Branch criada** a partir da `main` (que já contém o revert).
+
+**Decisão de escopo:** esta etapa é **somente planejamento** (instrução explícita: não implementar
+OCR agora). Entregável: `docs/explanation/ocr-plan.md`.
+
+**Docs Apple consultadas (apple-docs MCP):**
+- **Translation** — framework `Translation`, macOS 14.4+. `TranslationSession`/`translationTask`,
+  `LanguageAvailability`, `TranslationError`. Modelos de tradução **on-device** (baixados por idioma).
+  ⇒ É o que o QuickPaste usa hoje para traduzir. NÃO é Foundation Models / Core ML / Core AI.
+- **Vision `RecognizeTextRequest`** — struct, macOS 15+. Gera `RecognizedTextObservation`;
+  `recognitionLanguages` para restringir idiomas. Há também `RecognizeDocumentsRequest`,
+  `DetectDocumentSegmentationRequest`, `DetectTextRectanglesRequest`, `DetectBarcodesRequest`.
+  ⇒ Base do OCR.
+- **Core AI** — framework `CoreAI`, **macOS 27 (beta)**. Rodar modelos próprios no Apple silicon
+  (CPU/GPU/Neural Engine). `AIModel`, `AIModelAsset`, `InferenceFunction`, `NDArray`; ferramentas
+  `coreai-optimization`, `coreai-torch` (converter PyTorch), compilação AOT.
+  ⇒ Caminho para o modelo futuro de LaTeX (treinar → converter → inferência offline).
+
+**Decisão de arquitetura (swift-architecture-skill, Deep Refactor Mode):** OCR como **módulo aditivo
+e isolado atrás de protocolos** (seams), injetado por DI; **sem trocar a arquitetura** (segue MVVM) e
+**sem quebrar nada** (gated por `ocrEnabled`, default off). APIs beta (Core AI) ficam atrás de
+`@available` + adapter. Detalhes em `docs/explanation/ocr-plan.md`.
+
+**Sem código implementado.** Próximo passo (quando aprovado): Passo 1 do plano (protocolos + no-op).
+
+### Mudanças neste branch
+- `HANDOFF.md` (este arquivo) — criado.
+- `docs/explanation/ocr-plan.md` — plano de OCR.
+- `docs/README.md` — link para o plano.
