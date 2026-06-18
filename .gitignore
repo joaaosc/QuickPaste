@@ -1,9 +1,23 @@
+# macOS
 .DS_Store
+
+# agents
+skills-lock.json
+.claude/
+.agents/
+.codex/
+
+# Xcode / SwiftPM
 .build/
 build/
 DerivedData/
 .deriveddata/
-QuickPaste.xcodeproj/xcuserdata/
+.swiftpm/
+xcuserdata/
 *.xcuserstate
 *.xcscmblueprint
-.swiftpm/
+*.xccheckout
+*.moved-aside
+
+# Claude Code (per-user local settings — keep out of version control)
+.claude/settings.local.json
