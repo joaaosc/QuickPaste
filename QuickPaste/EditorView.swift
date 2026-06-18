@@ -10,8 +10,7 @@ struct EditorView: View {
 
     @State private var model: EditorModel
     @State private var didCopy = false
-
-    @FocusState private var editorFocused: Bool
+    @State private var focusToken = 0
 
     init() {
         _model = State(initialValue: EditorModel())
@@ -27,7 +26,7 @@ struct EditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            editor
+            editorArea
 
             if model.translation.isActive {
                 translationCard
@@ -48,36 +47,75 @@ struct EditorView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
             if notification.object is FloatingPanel {
-                editorFocused = true
+                focusToken += 1
             }
         }
         .onDisappear { model.persistNow() }
     }
 
-    // MARK: - Editor
+    // MARK: - Editor area (image attachment + text)
 
-    private var editor: some View {
+    private var editorArea: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let image = model.attachedImage {
+                attachedImageView(image)
+            }
+
+            noteField
+        }
+    }
+
+    private var noteField: some View {
         @Bindable var model = model
 
-        return TextEditor(text: $model.text)
-            .font(.system(size: fontSize))
-            .scrollContentBackground(.hidden)
-            .focused($editorFocused)
-            .padding(.horizontal, 8)
-            .padding(.bottom, 4)
-            .accessibilityLabel("Nota")
-            .onChange(of: model.text) { model.handleTextChanged() }
-            .overlay(alignment: .topLeading) {
-                if model.isEmpty {
-                    Text("Escreva algo…")
-                        .font(.system(size: fontSize))
-                        .foregroundStyle(.tertiary)
-                        .padding(.horizontal, 13)
-                        .padding(.top, 1)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
+        return NoteTextEditor(
+            text: $model.text,
+            fontSize: fontSize,
+            focusToken: focusToken,
+            onPasteImage: { model.pasteImage($0) }
+        )
+        .onChange(of: model.text) { model.handleTextChanged() }
+        .accessibilityLabel("Nota")
+        .overlay(alignment: .topLeading) { placeholder }
+    }
+
+    @ViewBuilder
+    private var placeholder: some View {
+        if model.text.isEmpty && model.attachedImage == nil {
+            Text("Escreva algo ou cole uma imagem (⌘V)…")
+                .font(.system(size: fontSize))
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 9)
+                .padding(.top, 8)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func attachedImageView(_ image: NSImage) -> some View {
+        Image(nsImage: image)
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity, maxHeight: 140, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    model.removeImage()
+                    focusToken += 1
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, .black.opacity(0.45))
+                        .font(.title3)
                 }
+                .buttonStyle(.plain)
+                .padding(6)
+                .help("Remover imagem")
+                .accessibilityLabel("Remover imagem")
             }
+            .padding(.horizontal, 10)
+            .padding(.top, 10)
+            .accessibilityLabel("Imagem colada")
     }
 
     // MARK: - Tradução
@@ -198,12 +236,12 @@ struct EditorView: View {
 
             Button {
                 model.clear()
-                editorFocused = true
+                focusToken += 1
             } label: {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
-            .disabled(model.isEmpty)
+            .disabled(!model.hasContent)
             .help("Limpar nota")
             .accessibilityLabel("Limpar nota")
         }

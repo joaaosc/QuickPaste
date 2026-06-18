@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import Translation
@@ -18,6 +19,11 @@ final class EditorModel {
     /// edits via `handleTextChanged()` from `.onChange`.
     var text: String
     private(set) var detectedLanguage: TranslationLanguage?
+
+    /// An image pasted from the clipboard (⌘V). Shown as an attachment in the editor;
+    /// translation ignores it for now.
+    private(set) var attachedImage: NSImage?
+
     private(set) var translation: TranslationOutcome = .idle
 
     /// Drives the view's `translationTask`. Reassigning (or invalidating) it re-runs the task.
@@ -54,11 +60,13 @@ final class EditorModel {
         let restored = persistence.note
         self.text = restored
         self.detectedLanguage = detector.detect(in: restored)
+        self.attachedImage = persistence.imageData.flatMap(NSImage.init(data:))
     }
 
     // MARK: Derived
 
     var isEmpty: Bool { text.isEmpty }
+    var hasContent: Bool { !text.isEmpty || attachedImage != nil }
     var wordCount: Int { text.split(whereSeparator: \.isWhitespace).count }
     var characterCount: Int { text.count }
 
@@ -155,10 +163,31 @@ final class EditorModel {
         pasteboard.write(value)
     }
 
+    // MARK: Image attachment
+
+    /// Attach an image pasted from the clipboard, persisting it as PNG.
+    func pasteImage(_ image: NSImage) {
+        attachedImage = image
+        persistence.imageData = Self.pngData(from: image)
+    }
+
+    func removeImage() {
+        attachedImage = nil
+        persistence.imageData = nil
+    }
+
+    private static func pngData(from image: NSImage) -> Data? {
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
+        return bitmap.representation(using: .png, properties: [:])
+    }
+
     // MARK: Clearing
 
     func clear() {
         text = ""
+        attachedImage = nil
+        persistence.imageData = nil
         dismissTranslation()
     }
 }

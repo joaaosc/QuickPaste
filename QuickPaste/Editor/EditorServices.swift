@@ -12,6 +12,8 @@ import NaturalLanguage
 /// but the model only depends on this protocol so tests can inject an in-memory store.
 protocol NotePersisting: AnyObject {
     var note: String { get set }
+    /// Encoded (PNG) data for an attached image, or nil when there is none.
+    var imageData: Data? { get set }
 }
 
 nonisolated final class UserDefaultsNotePersistence: NotePersisting {
@@ -27,12 +29,27 @@ nonisolated final class UserDefaultsNotePersistence: NotePersisting {
         get { defaults.string(forKey: key) ?? "" }
         set { defaults.set(newValue, forKey: key) }
     }
+
+    var imageData: Data? {
+        get { defaults.data(forKey: QuickPasteSettings.Key.noteImageData) }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: QuickPasteSettings.Key.noteImageData)
+            } else {
+                defaults.removeObject(forKey: QuickPasteSettings.Key.noteImageData)
+            }
+        }
+    }
 }
 
 /// In-memory note store for SwiftUI previews and unit tests (no UserDefaults side effects).
 nonisolated final class InMemoryNotePersistence: NotePersisting {
     var note: String
-    init(note: String = "") { self.note = note }
+    var imageData: Data?
+    init(note: String = "", imageData: Data? = nil) {
+        self.note = note
+        self.imageData = imageData
+    }
 }
 
 // MARK: - Pasteboard

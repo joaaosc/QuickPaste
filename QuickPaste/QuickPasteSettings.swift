@@ -1,12 +1,13 @@
 import Foundation
 
 enum QuickPasteSettings {
-    enum Key {
+    nonisolated enum Key {
         static let openEditorAtLaunch = "openEditorAtLaunch"
         static let globalHotKeyEnabled = "globalHotKeyEnabled"
         static let editorFontSize = "editorFontSize"
         static let targetLanguage = "targetLanguage"
         static let noteText = "noteText"
+        static let noteImageData = "noteImageData"
     }
 
     static let defaults = UserDefaults.standard

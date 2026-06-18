@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 @testable import QuickPaste
 
@@ -125,5 +126,47 @@ struct EditorModelTests {
         model.clear()
         #expect(model.text.isEmpty)
         #expect(model.translation == .idle)
+    }
+
+    // MARK: Image attachment
+
+    private func makeImage() -> NSImage {
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        )!
+        let image = NSImage(size: NSSize(width: 2, height: 2))
+        image.addRepresentation(rep)
+        return image
+    }
+
+    @Test("pasteImage attaches the image and persists PNG data")
+    func pasteImagePersists() {
+        let (model, store, _) = makeModel()
+        model.pasteImage(makeImage())
+        #expect(model.attachedImage != nil)
+        #expect(model.hasContent)
+        #expect(store.imageData != nil)
+    }
+
+    @Test("removeImage clears the attachment and its persisted data")
+    func removeImageClears() {
+        let (model, store, _) = makeModel()
+        model.pasteImage(makeImage())
+        model.removeImage()
+        #expect(model.attachedImage == nil)
+        #expect(store.imageData == nil)
+    }
+
+    @Test("clear also removes an attached image")
+    func clearRemovesImage() {
+        let (model, store, _) = makeModel(note: "hello")
+        model.pasteImage(makeImage())
+        model.clear()
+        #expect(model.text.isEmpty)
+        #expect(model.attachedImage == nil)
+        #expect(store.imageData == nil)
+        #expect(!model.hasContent)
     }
 }
