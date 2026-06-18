@@ -35,6 +35,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(windowDidResignKey(_:)),
+            name: NSWindow.didResignKeyNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(windowWillClose(_:)),
             name: NSWindow.willCloseNotification,
             object: nil
@@ -130,8 +136,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if window === editorPanel {
             editorPanel?.level = .floating
         } else if isSettingsWindow(window) {
+            // Settings must open as the active window, above everything (incl. the note).
             editorPanel?.level = .normal
+            if window.level != .floating { window.level = .floating }
+            NSApp.activate()
+            window.makeKeyAndOrderFront(nil)
         }
+    }
+
+    @objc private func windowDidResignKey(_ notification: Notification) {
+        // Once Settings loses focus, let it behave like a normal window again.
+        guard let window = notification.object as? NSWindow, isSettingsWindow(window) else { return }
+        window.level = .normal
     }
 
     @objc private func windowWillClose(_ notification: Notification) {
