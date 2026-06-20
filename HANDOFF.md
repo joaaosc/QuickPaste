@@ -5,6 +5,74 @@ e mudança, para continuar o desenvolvimento fora do Claude. Mais recente no top
 
 ---
 
+## 2026-06-19 — documentação funcional e de configuração do OCR
+
+**Documentado:** referência completa em `docs/reference/ocr.md`, cobrindo ativação, OCR automático e
+manual, estados, fila/cancelamento, parâmetros internos, pipeline, idioma, fallback, persistência,
+privacidade, limitações, arquitetura, testes e diagnóstico.
+
+**Alinhado:** `README.md`, índice `docs/README.md`, how-to de colar imagem, arquitetura e guia de
+desenvolvimento deixaram de afirmar que OCR/test target não existem.
+
+**Arquivos criados:** `docs/reference/ocr.md`.
+
+**Arquivos modificados:** `README.md`, `docs/README.md`, `docs/how-to/paste-an-image.md`,
+`docs/explanation/architecture.md`, `docs/explanation/development-guide.md`, `HANDOFF.md`.
+
+**Validação:** documentação confrontada com os defaults e fluxos do código. Apple Docs MCP
+reconfirmou `DetectTextRectanglesRequest`, `DetectDocumentSegmentationRequest` e
+`RecognizeTextRequest` no macOS 15+, e `RecognizeDocumentsRequest` no macOS 26+.
+
+**Bloqueadores:** nenhum. Nenhum código foi alterado; build/test não foram repetidos nesta etapa
+exclusivamente documental.
+
+**Próximo passo recomendado:** executar o smoke test GUI já pendente e registrar os resultados na
+seção de limitações/validação da referência OCR.
+
+## 2026-06-19 — OCR robusto, fila e testes executáveis
+
+**Passo OCR atual:** pipeline de texto robusto concluído sobre os Steps 1–3. O seam `.formula` /
+`FormulaConverting` foi preservado para uma branch futura; nenhuma API Core AI ou ação LaTeX foi
+implementada.
+
+**Implementado:**
+- Tipos OCR imutáveis/`Sendable`, blocos com confiança e retângulos normalizados.
+- Gate Vision com pré-filtro dimensional, `DetectTextRectanglesRequest`, cobertura, caracteres e
+  confiança ponderada; falhas do classificador chegam ao estado da UI.
+- Adapters Vision/Core Image isolados em actors próprios; preprocessor com segmentação/correção de
+  documento e upscale Lanczos limitado, sem trabalho pesado no `MainActor`.
+- `RecognizeDocumentsRequest` para documentos; OCR `.accurate` geral/fallback; idioma automático ou
+  hint derivado de `detectedLanguage`; assembler top-down/left-right com parágrafos.
+- `EditorModel` com fila FIFO, `OCRState`, cancelamento, erro e DI para classifier/preprocessor/
+  recognizer/formula converter. Desligar OCR cancela e limpa a fila.
+- `EditorView` sem conversão de imagem nem criação de `Task` quando OCR está off; faixa compacta de
+  progresso/erro/cancelamento separada da tradução.
+- Menu de contexto de imagem mesclado ao menu nativo do `NSTextView`; item LaTeX desabilitado removido.
+- Target macOS `QuickPasteTests` adicionado ao projeto e ao scheme, com fakes determinísticos e
+  cobertura de no-text, text, reconhecimento, erros, formula seam, flag off, cancelamento, FIFO,
+  ordenação e pós-processamento.
+
+**Arquivos modificados:** `QuickPaste.xcodeproj/project.pbxproj`, scheme `QuickPaste`,
+`EditorModel.swift`, `NoteTextEditor.swift`, `OCRServices.swift`, `OCRTypes.swift`, `EditorView.swift`,
+`QuickPasteTests/EditorModelTests.swift`, `docs/explanation/ocr-plan.md`, `HANDOFF.md`.
+
+**Arquivos criados:** `OCRImagePreprocessor.swift`, `OCRTextAssembler.swift` e
+`QuickPasteTests/OCR/{OCRTestDoubles,OCRPipelineTests,OCRTextAssemblerTests}.swift`.
+
+**Arquivos removidos:** nenhum. Somente a ação LaTeX prematura foi removida do menu.
+
+**Validação:** Apple Docs MCP confirmou disponibilidade e contratos de `DetectTextRectanglesRequest`
+(macOS 15+), `DetectDocumentSegmentationRequest` (macOS 15+), `RecognizeTextRequest` (macOS 15+) e
+`RecognizeDocumentsRequest` (macOS 26+). XcodeBuildMCP reconheceu o scheme; como suas ações macOS não
+estão expostas, build/test foram executados por `xcodebuild` com Xcode 27 beta. Build e 30 casos de
+teste verdes, sem warnings do código do projeto na execução final com `-quiet`.
+
+**Bloqueadores conhecidos:** nenhum de compilação/teste. Smoke test GUI manual (colar imagem real,
+clique direito e inspeção visual do cancelamento) ainda não foi executado nesta sessão.
+
+**Próximo passo recomendado:** executar o smoke test GUI com fixtures reais de screenshot, foto de
+documento e imagem sem texto; depois calibrar limiares do gate com um corpus versionado.
+
 ## 2026-06-18 — branch `feature/ocr-vision` (planejamento do OCR)
 
 **Antes de ramificar (na `main`):** revertidas as caixas (Liquid Glass) nos ícones da toolbar do

@@ -19,14 +19,24 @@ EditorModel (@Observable, @MainActor)
         │  depende de protocolos (DI)
         ▼
 NotePersisting · PasteboardWriting · LanguageDetecting   (EditorServices)
+ImageTextClassifying · ImagePreprocessing · TextRecognizing   (Editor/OCR)
 ```
 
 ## MVVM com seams por protocolo
-O editor segue **MVVM**: `EditorModel` é a fonte de verdade (conteúdo rich, máquina de estados de
-tradução, idioma detectado). A View depende de `EditorModel`, que depende de **protocolos**
-(`NotePersisting`, `PasteboardWriting`, `LanguageDetecting`) — mantendo a View fina e o estado
-testável com fakes (`InMemoryNotePersistence`). A persistência é **debounced**; `persistNow()` faz
-flush ao fechar o painel.
+O editor segue **MVVM**: `EditorModel` é a fonte de verdade (conteúdo rich, estados de tradução e
+OCR, idioma detectado e fila OCR). A View depende de `EditorModel`, que depende de **protocolos**
+para persistência, pasteboard, idioma e OCR — mantendo a View fina e o estado testável com fakes.
+A persistência é **debounced**; `persistNow()` faz flush ao fechar o painel.
+
+## OCR em imagens
+
+O pipeline OCR é um módulo aditivo em `Editor/OCR/`. `EditorModel` mantém a fila FIFO e o estado no
+`MainActor`; os adapters live de classificação, preprocessing e reconhecimento são actors próprios.
+Vision faz detecção/recognition, Core Image corrige perspectiva e amplia entradas pequenas, e o
+assembler puro restaura a ordem de leitura. A saída é anexada à nota de forma não destrutiva.
+
+Detalhes de funcionalidades, parâmetros e fallback estão na
+[referência do OCR](../reference/ocr.md).
 
 ## Conteúdo rich text e imagens inline
 A nota é um `NSAttributedString`, então imagens coladas ficam **inline no corpo do texto** como
@@ -68,10 +78,9 @@ O app é **sandboxed e sem entitlement de rede**. Tudo roda localmente:
   dentro do closure do `translationTask`, então a View mantém o `translationTask` e o model guarda o
   estado. Pode ser desligada em Configurações.
 - **Detecção de idioma**: `NLLanguageRecognizer` (NaturalLanguage), sem download de modelo.
-- **OCR**: opção presente, ainda não implementada (seria Vision, on-device).
+- **OCR**: Vision + Core Image, on-device; feature opt-in com fila, cancelamento e fallback.
 - **Dados**: nota (RTFD) e preferências em `UserDefaults`. Conteúdo do clipboard nunca é logado.
 
 ## Testes
-Os testes (Swift Testing, em `QuickPasteTests/`) exercitam o `EditorModel` e o detector com fakes via
-injeção de dependência — sem chamar modelos reais. Veja o
-[EXPERIMENT_REPORT](../EXPERIMENT_REPORT.md) para como conectar o test target.
+O target macOS `QuickPasteTests` faz parte do scheme. Os testes Swift Testing exercitam
+`EditorModel`, detector, pipeline e assembler OCR com fakes via DI, sem executar Vision real.

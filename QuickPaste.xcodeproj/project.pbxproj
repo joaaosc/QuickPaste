@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		A10000062FBF000100000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = EF6850D32FB916B500158F93 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EF6850DA2FB916B500158F93;
+			remoteInfo = QuickPaste;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		EF6850DB2FB916B500158F93 /* QuickPaste.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = QuickPaste.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000012FBF000100000001 /* QuickPasteTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = QuickPasteTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,22 @@
 			path = QuickPaste;
 			sourceTree = "<group>";
 		};
+		A10000022FBF000100000001 /* QuickPasteTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = QuickPasteTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		EF6850D82FB916B500158F93 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000032FBF000100000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				EF6850DD2FB916B500158F93 /* QuickPaste */,
+				A10000022FBF000100000001 /* QuickPasteTests */,
 				EF6850DC2FB916B500158F93 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				EF6850DB2FB916B500158F93 /* QuickPaste.app */,
+				A10000012FBF000100000001 /* QuickPasteTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +95,29 @@
 			productReference = EF6850DB2FB916B500158F93 /* QuickPaste.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A10000082FBF000100000001 /* QuickPasteTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A100000B2FBF000100000001 /* Build configuration list for PBXNativeTarget "QuickPasteTests" */;
+			buildPhases = (
+				A10000052FBF000100000001 /* Sources */,
+				A10000032FBF000100000001 /* Frameworks */,
+				A10000042FBF000100000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A10000072FBF000100000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A10000022FBF000100000001 /* QuickPasteTests */,
+			);
+			name = QuickPasteTests;
+			packageProductDependencies = (
+			);
+			productName = QuickPasteTests;
+			productReference = A10000012FBF000100000001 /* QuickPasteTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -80,6 +128,10 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
+					A10000082FBF000100000001 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = EF6850DA2FB916B500158F93;
+					};
 					EF6850DA2FB916B500158F93 = {
 						CreatedOnToolsVersion = 26.5;
 					};
@@ -100,12 +152,20 @@
 			projectRoot = "";
 			targets = (
 				EF6850DA2FB916B500158F93 /* QuickPaste */,
+				A10000082FBF000100000001 /* QuickPasteTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		EF6850D92FB916B500158F93 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000042FBF000100000001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,9 +182,60 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000052FBF000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A10000072FBF000100000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EF6850DA2FB916B500158F93 /* QuickPaste */;
+			targetProxy = A10000062FBF000100000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		A10000092FBF000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 33FPG9442W;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joaaosc.QuickPasteTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/QuickPaste.app/Contents/MacOS/QuickPaste";
+				TEST_TARGET_NAME = QuickPaste;
+			};
+			name = Debug;
+		};
+		A100000A2FBF000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 33FPG9442W;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joaaosc.QuickPasteTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/QuickPaste.app/Contents/MacOS/QuickPaste";
+				TEST_TARGET_NAME = QuickPaste;
+			};
+			name = Release;
+		};
 		EF6850E42FB916B700158F93 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -316,6 +427,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A100000B2FBF000100000001 /* Build configuration list for PBXNativeTarget "QuickPasteTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000092FBF000100000001 /* Debug */,
+				A100000A2FBF000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		EF6850D62FB916B500158F93 /* Build configuration list for PBXProject "QuickPaste" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

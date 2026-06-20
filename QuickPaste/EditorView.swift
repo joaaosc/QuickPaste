@@ -37,6 +37,10 @@ struct EditorView: View {
         VStack(spacing: 0) {
             editor
 
+            if model.ocrState != .idle {
+                ocrStatusBar
+            }
+
             if translationEnabled, model.translation.isActive {
                 translationCard
             }
@@ -59,6 +63,10 @@ struct EditorView: View {
                 focusToken += 1
             }
         }
+        .onAppear { model.setOCREnabled(ocrEnabled) }
+        .onChange(of: ocrEnabled) { _, enabled in
+            model.setOCREnabled(enabled)
+        }
         .onDisappear { model.persistNow() }
     }
 
@@ -72,13 +80,15 @@ struct EditorView: View {
             focusToken: focusToken,
             onChange: { model.updateContent($0) },
             onImagePasted: { image in
+                guard ocrEnabled else { return }
                 guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-                Task { await model.handlePastedImage(cgImage) }
+                model.enqueuePastedImage(cgImage)
             },
             ocrEnabled: ocrEnabled,
             onRecognizeImage: { image in
+                guard ocrEnabled else { return }
                 guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
-                Task { await model.recognizeText(in: cgImage) }
+                model.enqueueRecognition(cgImage)
             }
         )
         .accessibilityLabel("Nota")
@@ -95,6 +105,55 @@ struct EditorView: View {
                 .padding(.top, 8)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
+        }
+    }
+
+    // MARK: - OCR
+
+    @ViewBuilder
+    private var ocrStatusBar: some View {
+        switch model.ocrState {
+        case .idle:
+            EmptyView()
+        case .processing(let completed, let total):
+            HStack(spacing: 8) {
+                ProgressView(value: Double(completed), total: Double(max(total, 1)))
+                    .controlSize(.small)
+                    .frame(width: 72)
+
+                Text(total > 1 ? "OCR \(completed) de \(total)" : "Reconhecendo texto…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button("Cancelar") {
+                    model.cancelOCR()
+                }
+                .controlSize(.small)
+                .accessibilityHint("Cancela o reconhecimento atual e limpa a fila")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .accessibilityElement(children: .contain)
+        case .failed(let message):
+            HStack(spacing: 8) {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+
+                Spacer()
+
+                Button("Dispensar", systemImage: "xmark") {
+                    model.dismissOCRError()
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .help("Dispensar erro de OCR")
+                .accessibilityLabel("Dispensar erro de OCR")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
         }
     }
 

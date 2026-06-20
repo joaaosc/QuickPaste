@@ -7,7 +7,7 @@ leitor:
 |---|---|---|
 | **Tutoriais** | Aprender fazendo, do zero | [tutorials/getting-started.md](tutorials/getting-started.md) |
 | **How-to** | Resolver uma tarefa específica | [open-settings](how-to/open-settings.md) · [paste-an-image](how-to/paste-an-image.md) · [set-a-custom-shortcut](how-to/set-a-custom-shortcut.md) |
-| **Referência** | Consultar fatos (atalhos, settings) | [reference/keyboard-shortcuts.md](reference/keyboard-shortcuts.md) |
+| **Referência** | Consultar fatos (atalhos, settings, OCR) | [keyboard-shortcuts](reference/keyboard-shortcuts.md) · [OCR](reference/ocr.md) |
 | **Explicação** | Entender o desenho e os porquês | [architecture](explanation/architecture.md) · [development-guide](explanation/development-guide.md) · [ocr-plan](explanation/ocr-plan.md) |
 
 > Quer continuar o desenvolvimento sem o Claude? Comece pelo

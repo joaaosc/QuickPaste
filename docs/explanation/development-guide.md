@@ -31,6 +31,11 @@ QuickPaste/
     EditorServices.swift     Protocolos (seams) + impls: persistência, pasteboard, detecção.
     NoteTextEditor.swift     NSTextView rich text; ⌘V de imagem inline.
     TranslationOutcome.swift Máquina de estados da tradução.
+    OCR/
+      OCRTypes.swift         Tipos de domínio e estado OCR.
+      OCRServices.swift      Protocolos, classificador e recognizer Vision.
+      OCRImagePreprocessor.swift  Documento/perspectiva/upscale.
+      OCRTextAssembler.swift Ordenação e pós-processamento puros.
   Settings/
     SettingsContent.swift    TabView host (Geral/Avançado/Telas/Atalhos/Sobre).
     *SettingsView.swift       Uma view por aba.
@@ -42,7 +47,8 @@ QuickPasteTests/             Testes (Swift Testing) — ver "Testes".
 
 ### Editor (MVVM + seams)
 `EditorModel` é a fonte de verdade. Depende de protocolos (`NotePersisting`, `PasteboardWriting`,
-`LanguageDetecting`) injetados — troque por fakes em testes/previews (`InMemoryNotePersistence`).
+`LanguageDetecting`, `ImageTextClassifying`, `ImagePreprocessing`, `TextRecognizing`) injetados —
+troque por fakes em testes/previews (`InMemoryNotePersistence` e doubles em `QuickPasteTests/OCR`).
 Conteúdo é `NSAttributedString` (texto + imagens inline) persistido como **RTFD**; `plainText`
 (sem o caractere de anexo U+FFFC) alimenta tradução, contagem e detecção. Persistência é debounced
 (`persistNow()` faz flush ao fechar o painel).
@@ -51,6 +57,9 @@ Conteúdo é `NSAttributedString` (texto + imagens inline) persistido como **RTF
 `NoteTextEditor` é um `NSTextView` (rich text, `importsGraphics = false`). `ClipboardTextView.paste`
 insere a imagem do clipboard inline (escala à largura) quando há imagem e **nenhum** texto; respeita
 `allowMultipleImages` (modo single substitui a anterior).
+
+Com `ocrEnabled`, `EditorModel` classifica e reconhece novas imagens em fila FIFO. O clique direito
+sobre uma imagem oferece OCR manual. Veja [Referência: OCR em imagens](../reference/ocr.md).
 
 ### Tradução e detecção de idioma
 On-device: framework `Translation` (a `TranslationSession` só vale dentro do closure do
@@ -88,11 +97,13 @@ macOS 26+: `.glassEffect(_:in:)` (cartão de tradução, cabeçalho do Sobre) e 
 Crie `XSettingsView` em `Settings/` e adicione um `.tabItem` em `SettingsContent`.
 
 ## Testes
-`QuickPasteTests/` tem testes Swift Testing do `EditorModel` e do detector (fakes via DI). **Ainda
-não há test target** no `.xcodeproj` (evitou-se cirurgia no `project.pbxproj`). Para rodar:
-1. Xcode ▸ File ▸ New ▸ Target ▸ **Unit Testing Bundle** (`QuickPasteTests`, host = QuickPaste).
-2. Adicione os arquivos de `QuickPasteTests/` ao target.
-3. `⌘U`.
+`QuickPasteTests/` é um target macOS incluído no scheme `QuickPaste`. Ele cobre `EditorModel`,
+detecção de idioma e OCR com fakes determinísticos. Rode com `⌘U` ou:
+
+```sh
+xcodebuild -project QuickPaste.xcodeproj -scheme QuickPaste \
+  -configuration Debug -destination 'platform=macOS,arch=arm64' test
+```
 
 ## Convenções
 - **macOS-first**, frameworks Apple antes de terceiros.
@@ -100,12 +111,12 @@ não há test target** no `.xcodeproj` (evitou-se cirurgia no `project.pbxproj`)
 - **Verifique APIs beta/novas na doc** antes de usar (foi assim que se confirmou Translation,
   NaturalLanguage, `SettingsLink` e Liquid Glass).
 
-## Roadmap — OCR em imagens (próxima branch)
-A opção **"Reconhecer texto em imagens (OCR)"** (`ocrEnabled`) já existe, **sem implementação**.
-Plano sugerido (a fazer em uma branch nova, ex. `feature/ocr-vision`):
-1. Criar um seam `TextRecognizing` (protocolo) + impl `VisionTextRecognizer` usando **Vision**
-   (`VNRecognizeTextRequest`/`RecognizeTextRequest`, on-device) — confirmar a API atual no apple-docs.
-2. Ao colar uma imagem (em `ClipboardTextView`/`EditorModel`), se `ocrEnabled`, rodar OCR async e
-   inserir/anexar o texto reconhecido (decisão de UX: abaixo da imagem ou substituindo).
-3. Injetar um `FakeTextRecognizer` nos testes (golden outputs); nunca chamar Vision real em unit test.
-4. Manter on-device e macOS-first; tratar falhas com fallback (sem texto reconhecido → no-op).
+## OCR atual e próximos passos
+
+O OCR Vision está implementado, opt-in e testado com fakes. A referência completa está em
+[docs/reference/ocr.md](../reference/ocr.md). Próximos passos técnicos:
+
+1. smoke test com screenshots, fotos de documentos e imagens sem texto;
+2. corpus versionado para calibrar limiares;
+3. reconstrução mais rica de tabelas/layouts;
+4. módulo futuro e separado para fórmula → LaTeX; não há implementação Core AI hoje.

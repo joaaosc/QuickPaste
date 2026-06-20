@@ -13,6 +13,19 @@ largura). Você pode continuar digitando antes/depois dela.
 Por padrão a nota guarda **uma** imagem (colar outra substitui a anterior). Para permitir **várias**,
 ative **Configurações ▸ Avançado ▸ "Permitir colar mais de uma imagem"**.
 
+## Reconhecer o texto da imagem
+
+O OCR é opcional e vem desligado. Ative **Configurações ▸ Avançado ▸ "Reconhecer texto em imagens
+(OCR)"** para analisar automaticamente novas imagens coladas.
+
+O texto reconhecido é anexado ao fim da nota e a imagem original permanece inline. Para tentar OCR
+manualmente, clique com o botão direito sobre uma imagem e escolha **Reconhecer texto (OCR)**. Use
+essa ação quando o fluxo automático não encontrar texto.
+
+Durante o processamento, a faixa OCR permite cancelar a operação. Desativar o OCR também cancela o
+trabalho atual e limpa imagens pendentes na fila. Consulte a
+[referência completa do OCR](../reference/ocr.md).
+
 ## Como funciona
 O editor é um `NSTextView` rich text cujo `paste(_:)` verifica o clipboard: se houver **uma imagem e
 nenhum texto**, ela é inserida como anexo (`NSTextAttachment`) inline; caso contrário, o ⌘V cola
@@ -22,5 +35,7 @@ restaurado ao reabrir o app.
 ## Limitações atuais
 - **A tradução ignora imagens** — traduz apenas o texto (o caractere de anexo é descartado).
 - Se o clipboard tiver imagem **e** texto, o ⌘V cola o texto (não sequestra o paste de texto).
+- A qualidade do OCR depende do tamanho, contraste, inclinação e nitidez da imagem.
+- Fórmulas matemáticas ainda não são convertidas para LaTeX.
 - Para remover uma imagem, selecione-a no editor e apague (Delete), ou use a lixeira (🗑) para
   limpar tudo.

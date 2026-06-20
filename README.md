@@ -16,7 +16,8 @@ nota**, copie o conteúdo e traduza a nota com o framework on-device **Translati
 - **Colar imagem do clipboard com ⌘V**, inline no corpo do texto. Opcionalmente **mais de uma
   imagem** (Configurações ▸ Avançado).
 - Tradução on-device para 8 idiomas (pode ser desligada em Configurações).
-- **OCR em imagens**: opção presente em Configurações, **ainda não implementada** (será com Vision).
+- **OCR on-device em imagens** com Vision: automático ao colar, ação no clique direito, fila,
+  progresso, erro e cancelamento (opt-in em Configurações ▸ Avançado).
 - Botão de engrenagem no editor (canto inferior) que abre as Configurações.
 - Configurações em abas: **Geral, Avançado, Telas, Atalhos, Sobre**.
 - Persistência local da nota (RTFD, incl. imagens) e preferências em `UserDefaults`.
@@ -53,6 +54,9 @@ Passo a passo em [docs/how-to/open-settings.md](docs/how-to/open-settings.md).
 A documentação segue o modelo [Diátaxis](https://diataxis.fr) — comece por **[docs/](docs/README.md)**:
 tutorial, how-tos, referência e explicação.
 
+Detalhes das funcionalidades, configurações e parâmetros do OCR:
+**[docs/reference/ocr.md](docs/reference/ocr.md)**.
+
 ## Estrutura
 
 ```text
@@ -68,6 +72,7 @@ QuickPaste/
     EditorServices.swift     Seams: persistência (RTFD), pasteboard, detecção de idioma.
     NoteTextEditor.swift     Editor NSTextView rich text (⌘V de imagem inline).
     TranslationOutcome.swift Estado da tradução.
+    OCR/                     Gate, preprocessing, reconhecimento e pós-processamento OCR.
   Settings/
     SettingsContent.swift    TabView host.
     GeneralSettingsView.swift, AdvancedSettingsView.swift, DisplaysSettingsView.swift,
@@ -79,5 +84,5 @@ docs/                        Documentação (Diátaxis).
 ## Privacidade
 
 Tudo é **on-device**: nota (texto + imagens, em RTFD) e preferências ficam em `UserDefaults`;
-tradução e detecção de idioma rodam localmente. O app é sandboxed e **sem entitlement de rede**.
+tradução, detecção de idioma e OCR rodam localmente. O app é sandboxed e **sem entitlement de rede**.
 Detalhes em [docs/explanation/architecture.md](docs/explanation/architecture.md).

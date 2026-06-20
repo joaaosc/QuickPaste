@@ -21,6 +21,8 @@ final class EditorModel {
 
     private(set) var detectedLanguage: TranslationLanguage?
     private(set) var translation: TranslationOutcome = .idle
+    private(set) var ocrState: OCRState = .idle
+    private(set) var isOCREnabled: Bool
 
     /// Drives the view's `translationTask`. Reassigning (or invalidating) it re-runs the task.
     var translationConfiguration: TranslationSession.Configuration?
@@ -34,19 +36,39 @@ final class EditorModel {
     private let pasteboard: PasteboardWriting
     private let detector: LanguageDetecting
     private let classifier: ImageTextClassifying
+    private let imagePreprocessor: ImagePreprocessing
     private let recognizer: TextRecognizing
+    private let formulaConverter: (any FormulaConverting)?
     private let persistDebounce: Duration
     private let detectDebounce: Duration
 
     private var persistTask: Task<Void, Never>?
     private var detectTask: Task<Void, Never>?
+    private var ocrTask: Task<Void, Never>?
+    private var ocrQueue: [OCRJob] = []
+    private var ocrGeneration = UUID()
+    private var ocrCompleted = 0
+    private var ocrTotal = 0
+
+    private struct OCRJob: Sendable {
+        enum Kind: Equatable, Sendable {
+            case automatic
+            case explicit
+        }
+
+        let image: CGImage
+        let kind: Kind
+    }
 
     init(
         persistence: NotePersisting = UserDefaultsNotePersistence(),
         pasteboard: PasteboardWriting = SystemPasteboard(),
         detector: LanguageDetecting = NaturalLanguageDetector(),
         classifier: ImageTextClassifying = VisionImageTextClassifier(),
+        imagePreprocessor: ImagePreprocessing = VisionOCRImagePreprocessor(),
         recognizer: TextRecognizing = VisionTextRecognizer(),
+        formulaConverter: (any FormulaConverting)? = nil,
+        ocrEnabled: Bool? = nil,
         persistDebounce: Duration = .milliseconds(400),
         detectDebounce: Duration = .milliseconds(300)
     ) {
@@ -54,7 +76,10 @@ final class EditorModel {
         self.pasteboard = pasteboard
         self.detector = detector
         self.classifier = classifier
+        self.imagePreprocessor = imagePreprocessor
         self.recognizer = recognizer
+        self.formulaConverter = formulaConverter
+        self.isOCREnabled = ocrEnabled ?? QuickPasteSettings.ocrEnabled
         self.persistDebounce = persistDebounce
         self.detectDebounce = detectDebounce
 
@@ -176,6 +201,7 @@ final class EditorModel {
     // MARK: Clearing
 
     func clear() {
+        cancelOCR()
         attributedText = NSAttributedString(string: "")
         detectedLanguage = nil
         persistNow()
@@ -184,28 +210,122 @@ final class EditorModel {
 
     // MARK: OCR (text in images)
 
-    /// Auto-OCR after pasting an image (gated by the OCR setting). Classifies first to avoid
-    /// running accurate OCR on images without text.
-    func handlePastedImage(_ image: CGImage) async {
-        guard QuickPasteSettings.ocrEnabled else { return }
-        switch await classifier.classify(image) {
-        case .text:
-            await runRecognition(on: image)
-        case .formula:
-            break   // reserved for the separate LaTeX-conversion module (Core AI)
-        case .noText:
-            break
+    func setOCREnabled(_ enabled: Bool) {
+        guard isOCREnabled != enabled else { return }
+        isOCREnabled = enabled
+        if enabled == false { cancelOCR() }
+    }
+
+    /// Auto-OCR after paste. Disabled OCR never allocates a task or queues work.
+    func enqueuePastedImage(_ image: CGImage) {
+        enqueueOCR(OCRJob(image: image, kind: .automatic))
+    }
+
+    /// Explicit OCR from the image context menu skips only the viability classification.
+    func enqueueRecognition(_ image: CGImage) {
+        enqueueOCR(OCRJob(image: image, kind: .explicit))
+    }
+
+    func cancelOCR() {
+        ocrGeneration = UUID()
+        ocrTask?.cancel()
+        ocrTask = nil
+        ocrQueue.removeAll(keepingCapacity: false)
+        ocrCompleted = 0
+        ocrTotal = 0
+        ocrState = .idle
+    }
+
+    func dismissOCRError() {
+        if case .failed = ocrState { ocrState = .idle }
+    }
+
+    /// Test synchronization point; production code observes `ocrState` instead.
+    func waitForOCR() async {
+        while let task = ocrTask {
+            await task.value
         }
     }
 
-    /// Explicit OCR (e.g. right-click on an image) — skips the viability gate.
-    func recognizeText(in image: CGImage) async {
-        guard QuickPasteSettings.ocrEnabled else { return }
-        await runRecognition(on: image)
+    private func enqueueOCR(_ job: OCRJob) {
+        guard isOCREnabled else { return }
+
+        if ocrTask == nil {
+            ocrCompleted = 0
+            ocrTotal = 0
+        }
+        ocrQueue.append(job)
+        ocrTotal += 1
+        ocrState = .processing(completed: ocrCompleted, total: ocrTotal)
+        startOCRWorkerIfNeeded()
     }
 
-    private func runRecognition(on image: CGImage) async {
-        guard let recognized = try? await recognizer.recognize(in: image), !recognized.isEmpty else { return }
+    private func startOCRWorkerIfNeeded() {
+        guard ocrTask == nil, ocrQueue.isEmpty == false else { return }
+        let generation = ocrGeneration
+        ocrTask = Task { [weak self] in
+            await self?.drainOCRQueue(generation: generation)
+        }
+    }
+
+    private func drainOCRQueue(generation: UUID) async {
+        var lastErrorMessage: String?
+
+        while isOCREnabled, generation == ocrGeneration, ocrQueue.isEmpty == false {
+            let job = ocrQueue.removeFirst()
+            do {
+                try await processOCRJob(job, generation: generation)
+            } catch is CancellationError {
+                return
+            } catch {
+                lastErrorMessage = "OCR falhou: \(error.localizedDescription)"
+            }
+
+            guard generation == ocrGeneration else { return }
+            ocrCompleted += 1
+            if ocrQueue.isEmpty == false {
+                ocrState = .processing(completed: ocrCompleted, total: ocrTotal)
+            }
+        }
+
+        guard generation == ocrGeneration else { return }
+        ocrTask = nil
+        ocrQueue.removeAll(keepingCapacity: false)
+        ocrState = lastErrorMessage.map(OCRState.failed(message:)) ?? .idle
+    }
+
+    private func processOCRJob(_ job: OCRJob, generation: UUID) async throws {
+        try Task.checkCancellation()
+
+        if job.kind == .automatic {
+            switch try await classifier.classify(job.image) {
+            case .noText:
+                return
+            case .formula:
+                guard let formulaConverter else { return }
+                let latex = try await formulaConverter.latex(from: job.image)
+                try Task.checkCancellation()
+                guard isOCREnabled, generation == ocrGeneration else { throw CancellationError() }
+                appendRecognizedText(latex)
+                return
+            case .text:
+                break
+            }
+        }
+
+        try Task.checkCancellation()
+        let prepared = try await imagePreprocessor.prepare(job.image)
+        try Task.checkCancellation()
+
+        let languageHints = detectedLanguage.map { [$0.locale] } ?? []
+        let recognized = try await recognizer.recognize(
+            in: prepared.image,
+            mode: prepared.mode,
+            recognitionLanguages: languageHints
+        )
+        try Task.checkCancellation()
+        guard isOCREnabled, generation == ocrGeneration else { throw CancellationError() }
+        guard recognized.isEmpty == false else { return }
         appendRecognizedText(recognized.text)
     }
 

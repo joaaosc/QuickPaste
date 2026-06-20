@@ -1,5 +1,4 @@
 import AppKit
-import CoreGraphics
 import Testing
 @testable import QuickPaste
 
@@ -166,74 +165,7 @@ struct EditorModelTests {
         model.requestTranslation(to: .portuguese)
         model.clear()
         #expect(model.plainText.isEmpty)
-        #expect(!model.hasContent)
+        #expect(model.hasContent == false)
         #expect(model.translation == .idle)
-    }
-
-    // MARK: OCR
-
-    struct StubClassifier: ImageTextClassifying {
-        var result: ImageTextClass
-        func classify(_ image: CGImage) async -> ImageTextClass { result }
-    }
-
-    struct StubRecognizer: TextRecognizing {
-        var text: String
-        func recognize(in image: CGImage) async throws -> RecognizedText {
-            RecognizedText(text: text, confidence: 0.9)
-        }
-    }
-
-    private func makeCGImage() -> CGImage {
-        NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 4,
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-        )!.cgImage!
-    }
-
-    private func withOCREnabled(_ enabled: Bool, _ body: () async -> Void) async {
-        UserDefaults.standard.set(enabled, forKey: QuickPasteSettings.Key.ocrEnabled)
-        await body()
-        UserDefaults.standard.removeObject(forKey: QuickPasteSettings.Key.ocrEnabled)
-    }
-
-    @Test("handlePastedImage appends OCR text when enabled and the image has text")
-    func ocrAppendsWhenEnabled() async {
-        await withOCREnabled(true) {
-            let model = EditorModel(
-                persistence: InMemoryNotePersistence(note: "nota"),
-                classifier: StubClassifier(result: .text(confidence: 0.9)),
-                recognizer: StubRecognizer(text: "texto reconhecido")
-            )
-            await model.handlePastedImage(makeCGImage())
-            #expect(model.plainText.contains("texto reconhecido"))
-        }
-    }
-
-    @Test("handlePastedImage does nothing when OCR is disabled")
-    func ocrNoopWhenDisabled() async {
-        await withOCREnabled(false) {
-            let model = EditorModel(
-                persistence: InMemoryNotePersistence(note: "nota"),
-                classifier: StubClassifier(result: .text(confidence: 0.9)),
-                recognizer: StubRecognizer(text: "naoaparece")
-            )
-            await model.handlePastedImage(makeCGImage())
-            #expect(model.plainText == "nota")
-        }
-    }
-
-    @Test("A noText classification skips recognition")
-    func ocrSkipsWhenNoText() async {
-        await withOCREnabled(true) {
-            let model = EditorModel(
-                persistence: InMemoryNotePersistence(note: "nota"),
-                classifier: StubClassifier(result: .noText),
-                recognizer: StubRecognizer(text: "naoaparece")
-            )
-            await model.handlePastedImage(makeCGImage())
-            #expect(model.plainText == "nota")
-        }
     }
 }

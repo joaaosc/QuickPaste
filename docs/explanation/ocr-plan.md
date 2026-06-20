@@ -1,10 +1,28 @@
+Implementation policy: see `AGENTS.md`. This plan defines scope; `AGENTS.md` defines agent behavior.
+
 # Plano de OCR em imagens (e futuro LaTeX → .tex)
 
-> **Status: PLANO. Nada implementado ainda.** Branch `feature/ocr-vision`.
+> **Status: OCR DE TEXTO ROBUSTO IMPLEMENTADO.** Branch `feature/ocr-vision`.
 > Objetivo: (1) identificar de forma robusta o que é "imagem com texto" (viável p/ OCR) vs. o que
 > não é; (2) um OCR **extremamente competente**; (3) converter a arquitetura existente **sem
 > quebrar nada** (swift-architecture-skill); (4) preparar o caminho futuro: imagens de fórmulas
 > matemáticas → `.tex` via modelo próprio em **Core AI**, acionado por clique direito na imagem.
+
+## Estado implementado (2026-06-19)
+
+- Gate: dimensões mínimas, `DetectTextRectanglesRequest`, cobertura, caracteres e confiança
+  ponderada; erros são propagados.
+- Preparação: `DetectDocumentSegmentationRequest`, correção de perspectiva e upscale Lanczos
+  limitado com Core Image.
+- Reconhecimento: `RecognizeDocumentsRequest` para documentos, `RecognizeTextRequest .accurate`
+  como fluxo geral/fallback e idioma automático ou hint da nota.
+- Resultado: blocos imutáveis/`Sendable`, retângulos normalizados, confiança ponderada, ordenação
+  top-down/left-right e preservação de parágrafos.
+- Orquestração: fila FIFO no `EditorModel`, estado `idle/processing/failed`, cancelamento e feature
+  flag sem criar `Task` nem converter imagem quando desligada.
+- UI: faixa OCR separada da tradução; menu contextual nativo preservado e ação OCR adicionada.
+- Testes: target macOS `QuickPasteTests` no scheme, com fakes; nenhum Vision/Core AI real nos
+  testes. Core AI/LaTeX segue fora do escopo, apenas com seam opcional e sem item de menu.
 
 ## Frameworks (verificados no apple-docs)
 - **Vision** — `RecognizeTextRequest` (macOS 15+) → `RecognizedTextObservation`; apoio:
@@ -28,8 +46,7 @@ testável com fakes (mesmo padrão de `LanguageDetecting`).
 Objetivo: evitar rodar (e oferecer) OCR em fotos/decorações sem texto, e não falhar em capturas de
 tela/documentos. Pipeline em estágios, do mais barato ao mais caro:
 
-1. **Pré-filtro barato** — ignorar imagens minúsculas (ex.: < 32×32) ou com baixa variância (provável
-   cor sólida/ícone).
+1. **Pré-filtro barato** — ignorar imagens minúsculas por dimensão e contagem total de pixels.
 2. **Detecção de regiões de texto** — `DetectTextRectanglesRequest` (rápido, só localiza, não
    reconhece). Sem regiões plausíveis ⇒ classifica como **sem texto**.
 3. **Reconhecimento de sondagem** — `RecognizeTextRequest` com `recognitionLevel = .fast` na imagem
@@ -72,9 +89,11 @@ Saída do gate: `ImageTextClass` + (opcional) regiões/recorte para a Parte 2.
 
 ### Novos seams (protocolos) — em `Editor/OCR/`
 ```text
-ImageTextClassifying   func classify(_ image: NSImage) async -> ImageTextClass
-TextRecognizing        func recognize(in image: NSImage) async throws -> RecognizedText
-FormulaConverting      func latex(from image: NSImage) async throws -> String   // futuro (Core AI)
+ImageTextClassifying   func classify(_ image: CGImage) async throws -> ImageTextClass
+ImagePreprocessing     func prepare(_ image: CGImage) async throws -> OCRPreparedImage
+TextRecognizing        func recognize(in image: CGImage, mode: OCRRecognitionMode,
+                                      recognitionLanguages: [Locale.Language]) async throws -> RecognizedText
+FormulaConverting      func latex(from image: CGImage) async throws -> String   // futuro (Core AI)
 ```
 Tipos de domínio: `ImageTextClass { noText, text(confidence: Double), formula }`, `RecognizedText`.
 
@@ -85,9 +104,8 @@ Tipos de domínio: `ImageTextClass { noText, text(confidence: Double), formula }
 - Fakes p/ testes: `FakeTextRecognizer`, `FakeImageTextClassifier`, `FakeFormulaConverter`.
 
 ### Integração (DI, aditiva)
-- `EditorModel` ganha dependências **opcionais** injetadas:
-  `classifier: ImageTextClassifying? = nil`, `recognizer: TextRecognizing? = nil`
-  (default nil/live; nil ⇒ comportamento atual inalterado).
+- `EditorModel` recebe classifier, preprocessor e recognizer por DI com implementações Vision live;
+  `FormulaConverting` permanece opcional.
 - Coordenação fina pode ficar em `EditorModel` ou num `ImageOCRService` dedicado (preferível para
   manter o model enxuto): orquestra gate → OCR → inserção.
 - **Gate de feature**: tudo só roda se `QuickPasteSettings.ocrEnabled` (já existe, default off).
