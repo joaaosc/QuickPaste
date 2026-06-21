@@ -11,6 +11,7 @@ enum QuickPasteSettings {
         static let translationEnabled = "translationEnabled"
         static let ocrEnabled = "ocrEnabled"
         static let allowMultipleImages = "allowMultipleImages"
+        static let latexOutputDestination = "latexOutputDestination"
         static let customHotKeyKeyCode = "customHotKeyKeyCode"
         static let customHotKeyModifiers = "customHotKeyModifiers"
         static let customHotKeyDisplay = "customHotKeyDisplay"
@@ -27,6 +28,7 @@ enum QuickPasteSettings {
             Key.translationEnabled: true,
             Key.ocrEnabled: false,
             Key.allowMultipleImages: false,
+            Key.latexOutputDestination: LatexOutputDestination.insertIntoNote.rawValue,
             Key.customHotKeyKeyCode: -1,
             Key.customHotKeyModifiers: 0,
             Key.customHotKeyDisplay: "",
@@ -45,12 +47,35 @@ enum QuickPasteSettings {
         defaults.bool(forKey: Key.ocrEnabled)
     }
 
+    /// Where recognized LaTeX goes when a formula conversion succeeds.
+    static var latexOutputDestination: LatexOutputDestination {
+        LatexOutputDestination(rawValue: defaults.string(forKey: Key.latexOutputDestination) ?? "")
+            ?? .insertIntoNote
+    }
+
     /// The user's custom global shortcut (Carbon key code + modifiers), or nil when unset.
     static var customHotKey: (keyCode: UInt32, carbonModifiers: UInt32)? {
         let code = defaults.integer(forKey: Key.customHotKeyKeyCode)
         guard code >= 0 else { return nil }
         let modifiers = defaults.integer(forKey: Key.customHotKeyModifiers)
         return (UInt32(code), UInt32(modifiers))
+    }
+}
+
+/// Where a successful formula→LaTeX conversion sends its output. User-selectable in Settings.
+nonisolated enum LatexOutputDestination: String, CaseIterable, Identifiable {
+    case insertIntoNote
+    case copyToClipboard
+    case both
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .insertIntoNote: "Inserir na nota"
+        case .copyToClipboard: "Copiar para a área de transferência"
+        case .both: "Inserir e copiar"
+        }
     }
 }
 

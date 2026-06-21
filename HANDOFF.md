@@ -5,6 +5,111 @@ e mudança, para continuar o desenvolvimento fora do Claude. Mais recente no top
 
 ---
 
+## 2026-06-20 — investigação do crash `swift_retain` em "Converter fórmula para LaTeX"
+
+**Escopo (CLAUDE.md):** corrigir só o crash `EXC_BAD_ACCESS`/`swift_retain` ao converter fórmula.
+
+**Estado sujo confirmado (`git status --short`):** modificados AGENTS.md, HANDOFF.md, project.pbxproj,
+scheme, EditorModel.swift, NoteTextEditor.swift, EditorView.swift, entitlements, QuickPasteSettings.swift,
+AdvancedSettingsView.swift; novos não rastreados: CLAUDE.md, `Editor/FormulaRecognition/`, Info.plist,
+`QuickPasteTests/FormulaRecognition/`, `QuickPaste Application Support/`. Nada revertido.
+
+**Inspeção do caminho (menu → EditorView → EditorModel → CoreAIFormulaConverter → runtime Core AI):**
+- O limite de imagem é **idêntico** ao do OCR de texto: ambos fazem `NSImage→CGImage` no MainActor e
+  enfileiram só o `CGImage` (Sendable). Nenhum objeto AppKit cruza para a `Task`. ⇒ se o OCR de texto
+  funciona, o limite de imagem não é a causa; o crash é específico do runtime Core AI da fórmula.
+- Docs Apple (apple-docs MCP) confirmam: `InferenceFunction` **é dono dos próprios recursos** (pesos/
+  buffers) e é `Sendable`; `AIModel` é `struct`/`Sendable`. ⇒ soltar o `AIModel` em `CoreAIModelLoader.load()`
+  após `loadFunction` é seguro — **não** é a causa.
+- Construção de entrada `NDArray(scalars:shape:)` e tokenizer/tensor são valores puros — sem hazard.
+- Suspeita principal restante: tratamento de saída em `CoreAIModel.copyFloats` (consumir `InferenceValue`
+  / ler `NDArray.View` via ponteiro) — combina com `swift_retain` e com "0 eventos" (evento de inferência
+  só é gravado ao concluir a run; crash ao consumir a saída ocorreria antes disso).
+
+**Backtrace (fornecido pelo usuário):** crash em `Task` na pool cooperativa, `EXC_BAD_ACCESS` em
+`swift_retain` (ponteiro corrompido `0xa8000000000008`), pilha 100% em frameworks Apple:
+`CoreAIRuntime → BNNSCoreAIDelegate → BNNSGraphContextExecute_v2 → swift_retain`. Nenhum frame do
+QuickPaste. OCR de texto (Vision) **funciona**. ⇒ crash é exclusivamente na execução do grafo Core AI.
+
+**Causa raiz (confirmada):** a especialização do Core AI "produz código executável" (doc Apple,
+*Managing model specialization and caching*); o backend **CPU (BNNS Graph)** executa esse código
+**in-process via MAP_JIT**. O QuickPaste roda com **Hardened Runtime + App Sandbox** e o
+`QuickPaste.entitlements` só tinha `com.apple.security.app-sandbox` — **sem entitlement de JIT**. Sob o
+Hardened Runtime, a memória JIT do BNNS não mapeia/executa corretamente e o executor lê ponteiros lixo
+→ `swift_retain` em endereço inválido. O LatexOCRlab funciona por ser projeto separado (sem hardened/
+sandbox). O `FormulaConverterFactory` força `.cpu` (caminho exato que faz JIT in-process).
+
+**Correção:** adicionado `com.apple.security.cs.allow-jit` ao `QuickPaste.entitlements` (mantém o app
+sandboxed; só permite o JIT que o backend CPU do Core AI exige). Sem mudança de código, de semântica do
+modelo, do compute unit `.cpu` ou da estratégia de assets.
+
+**Verificação:** precisa de build **assinada** (Run no Xcode, ⌘R) — entitlements não são aplicados com
+`CODE_SIGNING_ALLOWED=NO`. Repetir: clique direito na imagem ▸ Converter fórmula para LaTeX.
+**Fallback** se persistir: somar `com.apple.security.cs.allow-unsigned-executable-memory` (caminho JIT
+legado), ou deixar o compute unit no `.automatic` (evita JIT in-process da CPU usando ANE/GPU).
+
+### CORREÇÃO DO DIAGNÓSTICO (mesma data) — a causa raiz é o MODELO subtreinado, não o QuickPaste
+
+A teoria do JIT/entitlement acima foi **descartada por evidência**. Depuração dirigida por XcodeBuildMCP
+(teste de paridade temporário rodando o `.aimodel` real no ambiente de build do QuickPaste, já removido):
+
+- Runtime do QuickPaste é **byte-idêntico** ao LatexOCRlab (mesmo `CoreAIModel`/`copyFloats`/loader/
+  decoder/preprocessing; só `public`→`nonisolated`). Settings de concorrência idênticos.
+- Teste headless: `DETERMINISTIC=true`, `PARITY(run==golden do lab)=true`, `CGImage==arquivo`,
+  e **sem crash** em ~10+ inferências. `.cpu`/`.gpu`/`.neuralEngine` e full/crop dão a **mesma** saída.
+- A saída é sempre o lixo fixo `{ 2 } ^ { 2 } ...` (`eos=false`, 256 passos) **independente da imagem**.
+- O **benchmark do próprio lab** (`results/predictions/benchmark-greedy.jsonl`, gerado em **PyTorch**
+  `best.pt`) tem **64/64** predições com esse mesmo lixo. `benchmark-greedy-summary.json`:
+  `exact_match=0.0`, `token_accuracy=0.10`, `eos_stop_rate=0.0`, `invalid_latex_rate=1.0`.
+- `results/training/run_summary.json`: **3 épocas, 120 passos**, `val_loss=3.25`. `configs/training.yaml`
+  é um **"BOUNDED prototype... Infrastructure, not accuracy"** (`max_train_batches: 40`, `batch_size: 16`)
+  → ~640 imagens/época de um dataset de 234k. Modelo essencialmente **não treinado**.
+
+**Conclusão:** modelo colapsou nos tokens mais frequentes e **ignora a imagem**. Core AI converte fiel;
+QuickPaste roda fiel. **A integração do QuickPaste está correta.** Correção = **retreinar** o modelo no
+LatexOCRlab (não basta reconverter). O crash provavelmente é efeito do decode desenfreado (256 passos,
+nunca EOS) sob hardened runtime — reavaliar após o modelo emitir EOS. Entitlements voltaram a só
+`app-sandbox` (allow-jit não comprovado). Artefatos temporários de debug removidos.
+
+## 2026-06-19 — correção de glitches visuais do editor (cor no dark mode + imagem colada)
+
+**Passo OCR atual:** inalterado (pipeline de texto concluído; `.formula`/`FormulaConverting` seam
+preservado). Esta etapa é só polimento visual do editor, sem mexer no pipeline OCR.
+
+**Sintomas relatados:** (1) cor da fonte ilegível no dark mode; (2) imagem colada "quase não ocupa
+espaço" e com aparência desorganizada.
+
+**Causa raiz:**
+- Cor: `NoteTextEditor` normalizava só a fonte (`.font`), nunca a cor. O round-trip RTFD grava uma
+  cor estática (preto), que fica ilegível no fundo escuro.
+- Imagem: `scaledBounds` exibia qualquer imagem mais estreita que a coluna no tamanho nativo em
+  pontos (minúscula em telas Retina) e nunca preenchia a largura; o attachment ficava inline,
+  colado ao texto, sem layout de bloco.
+
+**Implementado (somente `NoteTextEditor.swift`):**
+- Cor dinâmica `NSColor.textColor` (adapta a light/dark em runtime) fixada via novo helper
+  `normalizeAppearance(of:font:)`, chamado no `makeNSView` e nos dois caminhos de push externo do
+  `updateNSView`; `typingAttributes`/`textColor`/`insertionPointColor` também passam a usar
+  `.textColor`. Estilos de parágrafo são preservados (a imagem centralizada não é desfeita).
+- `displayBounds(for:)` (substitui `scaledBounds`): imagem preenche a coluna do editor preservando
+  proporção — reduz imagens grandes e amplia as pequenas no máximo 2× (mantém nitidez).
+- Imagem colada vira bloco centralizado, em linha própria, com espaçamento de parágrafo; quebra de
+  linha à frente só quando necessário e o caret cai numa linha esquerda/limpa abaixo. Re-colagem em
+  modo imagem-única agora colapsa linhas em branco residuais (sem acúmulo).
+
+**Arquivos modificados:** `QuickPaste/Editor/NoteTextEditor.swift`, `HANDOFF.md`.
+**Arquivos criados/removidos:** nenhum.
+
+**Validação:** `xcodebuild build test` (Xcode 27 beta, `platform=macOS`, scheme `QuickPaste`):
+`BUILD SUCCEEDED` + `TEST SUCCEEDED`, sem novos warnings do código do projeto (apenas o aviso pré-
+existente de AppIntents metadata). Suíte de 30 casos permanece verde. Inspeção visual (dark mode +
+imagem real) continua pendente — é a mesma verificação GUI já listada.
+
+**Bloqueadores conhecidos:** nenhum de compilação/teste.
+
+**Próximo passo recomendado:** smoke test GUI no editor — colar imagem (screenshot grande, imagem
+pequena, sem texto) e alternar light/dark — confirmando legibilidade e o bloco centralizado.
+
 ## 2026-06-19 — documentação funcional e de configuração do OCR
 
 **Documentado:** referência completa em `docs/reference/ocr.md`, cobrindo ativação, OCR automático e
@@ -164,3 +269,53 @@ Build: `BUILD SUCCEEDED`.
 **Estado do OCR:** Passos 1–3 feitos (texto). Falta: verificação em runtime; pré-processamento
 avançado (deskew/upscale) e `RecognizeDocumentsRequest` (opcional, ver ocr-plan); módulo LaTeX/Core
 AI (branch futura, seam pronto).
+
+### Implementação — Passo 4: fórmula → LaTeX via Core AI (runtime do LatexOCRlab portado) — 2026-06-20
+
+Objetivo: integrar o runtime validado do LatexOCRlab (imagem de fórmula → LaTeX, Core AI on-device)
+ao QuickPaste, atrás do seam `FormulaConverting` já existente, acionado pelo clique direito na imagem.
+
+Arquitetura:
+- Módulo aditivo `QuickPaste/Editor/FormulaRecognition/` (irmão de `Editor/OCR/`, que segue só Vision).
+  Runtime portado quase verbatim, marcado `nonisolated` (o alvo usa `SWIFT_DEFAULT_ACTOR_ISOLATION =
+  MainActor`). Preserva int32, loop greedy fixo de 257, especialização CPU e os shapes
+  ([1,3,160,640]→[1,100,192]→[1,257,580], vocab 580). `.aimodel`/contrato intactos.
+- Adapter `CoreAIFormulaConverter: FormulaConverting` (`@available(macOS 27, *)`): CGImage → tensor →
+  encoder/decoder → greedy → tokenizer → normalizer → **validação** → LaTeX, ou lança
+  `RecognitionError.noFormula`. `FormulaConverterFactory.make()` devolve `nil` em macOS < 27 / sem
+  Core AI, escondendo a ação.
+- `EditorModel`: nova `OCRJob.Kind.formula` + `enqueueFormula(_:)` reusam fila FIFO/cancelamento/
+  estado do OCR (gating por `ocrEnabled`). `dispatchLatex` roteia para o destino de Settings
+  (inserir / copiar / ambos) via seam `latexDestination` injetável; erros de fórmula aparecem sem o
+  prefixo "OCR falhou:".
+- Menu de contexto (AppKit) reescrito e agrupado, com SF Symbols: Reconhecer texto (text.viewfinder),
+  Converter fórmula para LaTeX (function, gated por Core AI), Copiar imagem (doc.on.doc), Abrir no
+  Preview (eye, só ícone + accessibilityDescription/tooltip). Copiar/Preview são ações puras de AppKit
+  (NSPasteboard / NSWorkspace com PNG temporário no container).
+- Settings ▸ Avançado: `Picker` "Saída do LaTeX" (enum `LatexOutputDestination`), gated por OCR.
+
+Assets (sandbox, runtime-path): `ResourceLocator` resolve o `.aimodel` no container **Application
+Support** primeiro; o vocab (`latexocr-v1-vocab.json`, 20 KB) é embarcado no bundle. O `.aimodel`
+(12 MB) **não** é versionado nem embarcado; ausência → mensagem de instalação (sem crash). Core AI fica
+**weak-linked** automaticamente (deploy 26.5 < disponibilidade 27 + `@available`) — confirmado por
+`otool` (`LC_LOAD_WEAK_DYLIB`).
+
+Arquivos criados: `Editor/FormulaRecognition/` (17 `.swift`: 15 portados/adaptados +
+`CoreAIFormulaConverter.swift` + `FormulaConverterFactory.swift`) e `latexocr-v1-vocab.json`;
+`QuickPasteTests/FormulaRecognition/FormulaRuntimeTests.swift` e `FormulaConversionTests.swift`.
+Arquivos modificados: `Editor/EditorModel.swift`, `Editor/NoteTextEditor.swift`, `EditorView.swift`,
+`QuickPasteSettings.swift`, `Settings/AdvancedSettingsView.swift`.
+
+Validação: `BUILD SUCCEEDED` (SDK macOS 27, deploy 26.5) e `TEST SUCCEEDED` — 0 falhas; suíte OCR
+existente + 16 testes novos (runtime puro com fake `TokenModel` + fluxo do `EditorModel` com fakes;
+nenhum Core AI real nos testes).
+
+Blockers / pendências:
+- Smoke test em runtime (macOS 27): instalar o `.aimodel` no container, validar fórmula real,
+  no-formula, copiar imagem, abrir no Preview, e launch limpo em macOS 26.5 (ação ausente).
+- Acessibilidade: "Abrir no Preview" é só ícone (por pedido); VoiceOver depende da
+  accessibilityDescription/tooltip — avaliar rótulo visível se necessário.
+- Docs (`docs/reference/ocr.md`, `ocr-plan.md`, `architecture.md`, `development-guide.md`) ainda
+  descrevem LaTeX como trabalho futuro — atualizar.
+
+Próximo passo: smoke test GUI da conversão em macOS 27 e atualizar a referência de OCR/LaTeX.

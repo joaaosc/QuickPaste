@@ -39,6 +39,9 @@ final class EditorModel {
     private let imagePreprocessor: ImagePreprocessing
     private let recognizer: TextRecognizing
     private let formulaConverter: (any FormulaConverting)?
+    /// Read live so a Settings change during the session takes effect on the next conversion;
+    /// injectable so tests can pin a destination without touching global defaults.
+    private let latexDestination: () -> LatexOutputDestination
     private let persistDebounce: Duration
     private let detectDebounce: Duration
 
@@ -54,6 +57,7 @@ final class EditorModel {
         enum Kind: Equatable, Sendable {
             case automatic
             case explicit
+            case formula
         }
 
         let image: CGImage
@@ -68,6 +72,7 @@ final class EditorModel {
         imagePreprocessor: ImagePreprocessing = VisionOCRImagePreprocessor(),
         recognizer: TextRecognizing = VisionTextRecognizer(),
         formulaConverter: (any FormulaConverting)? = nil,
+        latexDestination: @escaping () -> LatexOutputDestination = { QuickPasteSettings.latexOutputDestination },
         ocrEnabled: Bool? = nil,
         persistDebounce: Duration = .milliseconds(400),
         detectDebounce: Duration = .milliseconds(300)
@@ -79,6 +84,7 @@ final class EditorModel {
         self.imagePreprocessor = imagePreprocessor
         self.recognizer = recognizer
         self.formulaConverter = formulaConverter
+        self.latexDestination = latexDestination
         self.isOCREnabled = ocrEnabled ?? QuickPasteSettings.ocrEnabled
         self.persistDebounce = persistDebounce
         self.detectDebounce = detectDebounce
@@ -210,6 +216,10 @@ final class EditorModel {
 
     // MARK: OCR (text in images)
 
+    /// Whether formula→LaTeX conversion can run (a Core AI converter was injected, i.e. macOS 27
+    /// with Core AI). Drives whether the "Converter fórmula para LaTeX" menu item is offered.
+    var isFormulaConversionAvailable: Bool { formulaConverter != nil }
+
     func setOCREnabled(_ enabled: Bool) {
         guard isOCREnabled != enabled else { return }
         isOCREnabled = enabled
@@ -224,6 +234,13 @@ final class EditorModel {
     /// Explicit OCR from the image context menu skips only the viability classification.
     func enqueueRecognition(_ image: CGImage) {
         enqueueOCR(OCRJob(image: image, kind: .explicit))
+    }
+
+    /// Explicit formula→LaTeX from the image context menu. Requires the Core AI converter;
+    /// reuses the OCR queue/cancellation/state and is gated by `isOCREnabled` like the rest.
+    func enqueueFormula(_ image: CGImage) {
+        guard formulaConverter != nil else { return }
+        enqueueOCR(OCRJob(image: image, kind: .formula))
     }
 
     func cancelOCR() {
@@ -278,7 +295,7 @@ final class EditorModel {
             } catch is CancellationError {
                 return
             } catch {
-                lastErrorMessage = "OCR falhou: \(error.localizedDescription)"
+                lastErrorMessage = Self.failureMessage(for: error)
             }
 
             guard generation == ocrGeneration else { return }
@@ -297,6 +314,15 @@ final class EditorModel {
     private func processOCRJob(_ job: OCRJob, generation: UUID) async throws {
         try Task.checkCancellation()
 
+        if job.kind == .formula {
+            guard let formulaConverter else { return }
+            let latex = try await formulaConverter.latex(from: job.image)
+            try Task.checkCancellation()
+            guard isOCREnabled, generation == ocrGeneration else { throw CancellationError() }
+            dispatchLatex(latex)
+            return
+        }
+
         if job.kind == .automatic {
             switch try await classifier.classify(job.image) {
             case .noText:
@@ -306,7 +332,7 @@ final class EditorModel {
                 let latex = try await formulaConverter.latex(from: job.image)
                 try Task.checkCancellation()
                 guard isOCREnabled, generation == ocrGeneration else { throw CancellationError() }
-                appendRecognizedText(latex)
+                dispatchLatex(latex)
                 return
             case .text:
                 break
@@ -329,6 +355,22 @@ final class EditorModel {
         appendRecognizedText(recognized.text)
     }
 
+    /// Route recognized LaTeX to the destination chosen in Settings (non-destructive: keeps the
+    /// image). Insert appends to the note like OCR; copy writes the LaTeX to the clipboard.
+    private func dispatchLatex(_ latex: String) {
+        let trimmed = latex.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return }
+        switch latexDestination() {
+        case .insertIntoNote:
+            appendRecognizedText(trimmed)
+        case .copyToClipboard:
+            pasteboard.write(trimmed)
+        case .both:
+            appendRecognizedText(trimmed)
+            pasteboard.write(trimmed)
+        }
+    }
+
     /// Append recognized text to the note (non-destructive: keeps the image).
     private func appendRecognizedText(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -341,6 +383,15 @@ final class EditorModel {
         attributedText = mutable
         persistNow()
         detectedLanguage = detector.detect(in: plainText)
+    }
+
+    /// Formula-domain errors (no formula / asset missing) already read as full sentences; only
+    /// generic OCR errors get the "OCR falhou:" prefix.
+    private static func failureMessage(for error: Error) -> String {
+        if error is RecognitionError || error is RuntimeResourceError {
+            return error.localizedDescription
+        }
+        return "OCR falhou: \(error.localizedDescription)"
     }
 
     // MARK: RTFD helpers

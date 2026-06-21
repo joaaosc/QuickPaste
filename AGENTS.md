@@ -172,28 +172,6 @@ Expected behavior:
 - report scheme, destination, and result;
 - do not claim validation succeeded unless build/test actually ran.
 
-## Architecture Policy
-
-Keep the project modular.
-
-Prefer this separation:
-
-- `App`: app entry point, scene setup, app-level wiring.
-- `Features`: user-facing feature modules.
-- `Core`: domain models, pure logic, shared abstractions.
-- `Services`: system integrations and side effects.
-- `Infrastructure`: file system, persistence, external APIs, adapters.
-- `UI`: reusable views and visual components, if the project uses a shared UI layer.
-- `Tests`: unit tests, integration tests, fixtures, and smoke tests.
-
-SwiftUI views should not own heavy business logic.
-
-ViewModels may coordinate UI state, but domain rules should live outside the ViewModel when they are reusable or testable.
-
-Services should usually be accessed through protocols when doing so improves testability.
-
-Avoid premature abstraction. Add protocols and layers when they support testing, feature boundaries, or platform separation.
-
 ## macOS UX Policy
 
 The app must feel native to macOS.
@@ -216,23 +194,6 @@ Avoid:
 - modal-heavy flows;
 - business logic embedded in views;
 - visual changes that reduce clarity or accessibility.
-
-## Apple AI / Model Policy
-
-Before implementing any AI/model feature, answer:
-
-1. Can the feature be solved deterministically without AI?
-2. Can Vision, NaturalLanguage, Core ML/CoreAI, or Foundation Models solve it locally?
-3. Is a custom model required?
-4. What data leaves the device, if any?
-5. What happens when the model/API is unavailable?
-6. How will output quality be evaluated?
-7. What parts are deterministic and testable?
-8. What parts require manual or fixture-based evaluation?
-
-AI output should be editable or inspectable when it may be imperfect.
-
-Long-running model work must expose progress, cancellation, and error states.
 
 ## Testing Policy
 

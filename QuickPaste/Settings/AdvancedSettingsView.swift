@@ -13,6 +13,9 @@ struct AdvancedSettingsView: View {
     @AppStorage(QuickPasteSettings.Key.ocrEnabled)
     private var ocrEnabled = false
 
+    @AppStorage(QuickPasteSettings.Key.latexOutputDestination)
+    private var latexOutputDestinationRaw = LatexOutputDestination.insertIntoNote.rawValue
+
     var body: some View {
         Form {
             Section("Tradução") {
@@ -32,10 +35,17 @@ struct AdvancedSettingsView: View {
 
             Section {
                 Toggle("Reconhecer texto em imagens (OCR)", isOn: $ocrEnabled)
+
+                Picker("Saída do LaTeX", selection: $latexOutputDestinationRaw) {
+                    ForEach(LatexOutputDestination.allCases) { destination in
+                        Text(destination.displayName).tag(destination.rawValue)
+                    }
+                }
+                .disabled(!ocrEnabled)
             } header: {
-                Text("OCR em imagens")
+                Text("OCR e fórmulas em imagens")
             } footer: {
-                Text("Reconhece texto em imagens coladas (Vision, on-device) e pelo clique direito na imagem. A conversão de fórmulas para LaTeX virá depois.")
+                Text("Reconhece texto (Vision, on-device) e converte fórmulas para LaTeX pelo clique direito na imagem. A conversão de fórmulas requer macOS 27 (Core AI) e o modelo LatexOCR instalado localmente.")
                     .foregroundStyle(.secondary)
             }
         }

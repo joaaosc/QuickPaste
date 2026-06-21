@@ -22,7 +22,7 @@ struct EditorView: View {
     @State private var focusToken = 0
 
     init() {
-        _model = State(initialValue: EditorModel())
+        _model = State(initialValue: EditorModel(formulaConverter: FormulaConverterFactory.make()))
     }
 
     init(model: EditorModel) {
@@ -89,6 +89,12 @@ struct EditorView: View {
                 guard ocrEnabled else { return }
                 guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
                 model.enqueueRecognition(cgImage)
+            },
+            latexMenuEnabled: ocrEnabled && model.isFormulaConversionAvailable,
+            onConvertFormula: { image in
+                guard ocrEnabled else { return }
+                guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return }
+                model.enqueueFormula(cgImage)
             }
         )
         .accessibilityLabel("Nota")
